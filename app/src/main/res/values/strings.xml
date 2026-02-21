@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">GrabadoraLegal</string>
+
+    <string name="accesibilidad_descripcion">Activa la protección Centinela para grabar audio discretamente pulsando 3 veces el botón de volumen arriba, incluso con la pantalla bloqueada.</string>
+
+    <string name="servicio_descripcion">Servicio de Protección de Evidencias</string>
+</resources>
