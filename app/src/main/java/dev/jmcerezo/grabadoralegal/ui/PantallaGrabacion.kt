@@ -14,8 +14,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jmcerezo.grabadoralegal.core.GrabadoraMotor
-
-// IMPORTANTE: Estos dos imports son los que suelen faltar para el "by"
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -26,9 +24,10 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
+            .wrapContentHeight()
             .background(Color(0xFF0F111A)) // Azul Noche Profesional
-            .padding(24.dp)
+            .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         // Cabecera Minimalista
         Text(
@@ -37,7 +36,7 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 4.sp,
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = 8.dp)
         )
 
         Text(
@@ -46,7 +45,7 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             fontSize = 14.sp
         )
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Tarjeta de Estado Principal
         Card(
@@ -56,7 +55,7 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         ) {
             Row(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(20.dp)
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -86,15 +85,22 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                     }
                 }
 
-                // Botón de acción rápido
+                // Botón de acción corregido
                 IconButton(
                     onClick = {
                         if (grabando) {
+                            // 1. Detenemos la grabación
                             gestorAudio.detenerGrabacion()
+                            // 2. Sincronizamos el estado visual
+                            grabando = false
+                            // 3. SOLO AHORA avisamos para que la lista se actualice
+                            alVerArchivos()
                         } else {
+                            // Al iniciar, no llamamos a alVerArchivos()
+                            // para evitar que la lista se refresque antes de tiempo
                             gestorAudio.iniciarGrabacion()
+                            grabando = true
                         }
-                        grabando = gestorAudio.estaGrabando
                     },
                     modifier = Modifier
                         .size(56.dp)
@@ -121,27 +127,16 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             InfoCard(modifier = Modifier.weight(1f), title = "Formato", value = "M4A HQ")
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Botón Inferior: Historial
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clickable { alVerArchivos() },
-            color = Color(0xFF1A1D2E),
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3D5AFE))
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "ACCEDER AL HISTORIAL",
-                    color = Color(0xFF3D5AFE),
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-            }
-        }
+        // Título del Historial
+        Text(
+            text = "HISTORIAL RECIENTE",
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
     }
 }
 
@@ -152,9 +147,9 @@ fun InfoCard(modifier: Modifier, title: String, value: String) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1D2E)),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Text(text = title, color = Color.Gray, fontSize = 10.sp)
-            Text(text = value, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(text = value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

@@ -23,99 +23,89 @@ import dev.jmcerezo.grabadoralegal.model.GrabacionDato
 fun PantallaListaArchivos(gestorAudio: GrabadoraMotor, alVolver: () -> Unit) {
     val contexto = LocalContext.current
 
-    // Cargamos la lista de grabaciones desde el motor
-    val listaGrabaciones = remember {
-        mutableStateListOf<GrabacionDato>().apply {
-            addAll(gestorAudio.obtenerGrabaciones())
+    // Estado de la lista cargada desde el motor
+    var listaGrabaciones by remember {
+        mutableStateOf(gestorAudio.obtenerGrabaciones())
+    }
+
+    // Efecto para refrescar la lista automáticamente cuando el estado de grabación cambia
+    LaunchedEffect(gestorAudio.estaGrabando) {
+        if (!gestorAudio.estaGrabando) {
+            listaGrabaciones = gestorAudio.obtenerGrabaciones()
         }
     }
 
     var archivoParaEliminar by remember { mutableStateOf<GrabacionDato?>(null) }
 
-    Column(
+    // Usamos Box en lugar de Column para que el scroll sea más natural en la pantalla compartida
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0F111A)) // Azul Noche coherente
-            .padding(24.dp)
+            .padding(horizontal = 24.dp)
     ) {
-        Text(
-            text = "EVIDENCIAS GUARDADAS",
-            color = Color.White,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 2.sp
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Lista de archivos
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(listaGrabaciones) { grabacion ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1D2E)),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+        if (listaGrabaciones.isEmpty()) {
+            Text(
+                text = "No hay grabaciones disponibles",
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.Center),
+                fontSize = 14.sp
+            )
+        } else {
+            // Lista de archivos con scroll independiente
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 24.dp) // Espacio extra al final del scroll
+            ) {
+                items(listaGrabaciones) { grabacion ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1D2E)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    gestorAudio.reproducirAudio(grabacion.archivo)
-                                    Toast.makeText(contexto, "Reproduciendo...", Toast.LENGTH_SHORT).show()
-                                }
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = grabacion.fecha,
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "SHA-256: ${grabacion.hash.take(16)}...",
-                                color = Color(0xFF3D5AFE),
-                                fontSize = 10.sp
-                            )
-                        }
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        gestorAudio.reproducirAudio(grabacion.archivo)
+                                        Toast.makeText(contexto, "Reproduciendo...", Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                Text(
+                                    text = grabacion.fecha,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "SHA-256: ${grabacion.hash.take(16)}...",
+                                    color = Color(0xFF3D5AFE),
+                                    fontSize = 10.sp
+                                )
+                            }
 
-                        // Botones de acción
-                        IconButton(onClick = { gestorAudio.compartirArchivo(grabacion) }) {
-                            Text("📤", fontSize = 20.sp)
-                        }
+                            // Botones de acción
+                            IconButton(onClick = { gestorAudio.compartirArchivo(grabacion) }) {
+                                Text("📤", fontSize = 20.sp)
+                            }
 
-                        IconButton(onClick = { archivoParaEliminar = grabacion }) {
-                            Text("🗑️", fontSize = 20.sp)
+                            IconButton(onClick = { archivoParaEliminar = grabacion }) {
+                                Text("🗑️", fontSize = 20.sp)
+                            }
                         }
                     }
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Botón Volver
-        Button(
-            onClick = {
-                gestorAudio.detenerReproduccion()
-                alVolver()
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1D2E)),
-            shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3D5AFE))
-        ) {
-            Text("VOLVER AL PANEL", color = Color(0xFF3D5AFE), fontWeight = FontWeight.Bold)
-        }
     }
 
-    // Cuadro de diálogo de eliminación (se mantiene igual pero con estilo)
+    // Cuadro de diálogo de eliminación
     if (archivoParaEliminar != null) {
         AlertDialog(
             onDismissRequest = { archivoParaEliminar = null },
@@ -127,7 +117,9 @@ fun PantallaListaArchivos(gestorAudio: GrabadoraMotor, alVolver: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     archivoParaEliminar?.let {
-                        if (gestorAudio.eliminarGrabacion(it.archivo)) listaGrabaciones.remove(it)
+                        if (gestorAudio.eliminarGrabacion(it.archivo)) {
+                            listaGrabaciones = gestorAudio.obtenerGrabaciones()
+                        }
                     }
                     archivoParaEliminar = null
                 }) { Text("ELIMINAR", color = Color(0xFFFF5252)) }
