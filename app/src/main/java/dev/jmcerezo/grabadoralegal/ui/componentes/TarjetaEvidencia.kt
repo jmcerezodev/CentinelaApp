@@ -21,13 +21,14 @@ import dev.jmcerezo.grabadoralegal.model.GrabacionDato
 @Composable
 fun TarjetaEvidencia(
     grabacion: GrabacionDato,
+    estaMarcado: Boolean, // Nuevo: Recibe el estado de la lista
+    onToggleFavorite: () -> Unit, // Nuevo: Avisa que queremos cambiar el estado
     onPlay: () -> Unit,
     onRename: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit
 ) {
     var menuExpandido by remember { mutableStateOf(false) }
-    // ESTADOS INDEPENDIENTES
     var reproductorVisible by remember { mutableStateOf(false) }
     var infoVisible by remember { mutableStateOf(false) }
 
@@ -39,26 +40,33 @@ fun TarjetaEvidencia(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // CABECERA SIEMPRE VISIBLE
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // El click en la tarjeta ahora controla el REPRODUCTOR
                     .clickable { reproductorVisible = !reproductorVisible }
                     .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // TÍTULO Y FECHA
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = grabacion.archivo.nameWithoutExtension,
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = grabacion.archivo.nameWithoutExtension,
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (estaMarcado) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = Color(0xFF3D5AFE),
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = grabacion.fecha,
                         color = Color.Gray,
@@ -66,24 +74,44 @@ fun TarjetaEvidencia(
                     )
                 }
 
-                // BOTONES DE ACCIÓN
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // BOTÓN INFO (Controla solo los DATOS TÉCNICOS)
-                    IconButton(onClick = { infoVisible = !infoVisible }) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    IconButton(
+                        onClick = { onToggleFavorite() },
+                        modifier = Modifier.size(32.dp)
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Ver detalles",
-                            tint = if (infoVisible) Color(0xFF3D5AFE) else Color.Gray
+                            imageVector = Icons.Default.Favorite,
+                            contentDescription = "Destacar",
+                            tint = if (estaMarcado) Color(0xFF3D5AFE) else Color.Gray.copy(alpha = 0.3f),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    // BOTÓN MENÚ (3 PUNTOS)
+                    IconButton(
+                        onClick = { infoVisible = !infoVisible },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info",
+                            tint = if (infoVisible) Color(0xFF3D5AFE) else Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     Box {
-                        IconButton(onClick = { menuExpandido = true }) {
+                        IconButton(
+                            onClick = { menuExpandido = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "Opciones",
-                                tint = Color.Gray
+                                tint = Color.Gray,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
@@ -113,7 +141,6 @@ fun TarjetaEvidencia(
                 }
             }
 
-            // SECCIÓN 1: REPRODUCTOR (Se activa al tocar la tarjeta)
             AnimatedVisibility(visible = reproductorVisible) {
                 Column(
                     modifier = Modifier
@@ -125,7 +152,6 @@ fun TarjetaEvidencia(
                 }
             }
 
-            // SECCIÓN 2: INFORMACIÓN TÉCNICA (Se activa con el botón Info)
             AnimatedVisibility(visible = infoVisible) {
                 Column(
                     modifier = Modifier
@@ -137,14 +163,9 @@ fun TarjetaEvidencia(
                         modifier = Modifier.padding(bottom = 12.dp),
                         color = Color.Gray.copy(alpha = 0.1f)
                     )
-
                     DatoFila(etiqueta = "HASH SHA-256", valor = grabacion.hash.uppercase())
                     Spacer(modifier = Modifier.height(8.dp))
-                    DatoFila(
-                        etiqueta = "LOCALIZACIÓN",
-                        valor = grabacion.ubicacion,
-                        esUbicacion = true
-                    )
+                    DatoFila(etiqueta = "LOCALIZACIÓN", valor = grabacion.ubicacion, esUbicacion = true)
                 }
             }
         }
@@ -161,27 +182,12 @@ fun DatoFila(etiqueta: String, valor: String, esUbicacion: Boolean = false) {
             fontWeight = FontWeight.ExtraBold,
             letterSpacing = 1.sp
         )
-
-        Row(
-            modifier = Modifier.padding(top = 2.dp),
-            verticalAlignment = Alignment.Top
-        ) {
+        Row(modifier = Modifier.padding(top = 2.dp), verticalAlignment = Alignment.Top) {
             if (esUbicacion) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    null,
-                    tint = Color(0xFF3D5AFE),
-                    modifier = Modifier.size(14.dp).padding(top = 2.dp)
-                )
+                Icon(Icons.Default.LocationOn, null, tint = Color(0xFF3D5AFE), modifier = Modifier.size(14.dp).padding(top = 2.dp))
                 Spacer(modifier = Modifier.width(4.dp))
             }
-            Text(
-                text = valor,
-                color = Color.LightGray,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-                fontWeight = FontWeight.Normal
-            )
+            Text(text = valor, color = Color.LightGray, fontSize = 12.sp, lineHeight = 16.sp)
         }
     }
 }

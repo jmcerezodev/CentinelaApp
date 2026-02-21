@@ -46,10 +46,23 @@ class GrabadoraMotor(private val contexto: Context) {
         if (estaGrabando) return
 
         val storageDir = contexto.filesDir
-        val timestamp = System.currentTimeMillis()
-        val nombreBase = "REC_$timestamp"
-        archivoAudio = File(storageDir, "$nombreBase.m4a")
-        val archivoLoc = File(storageDir, "$nombreBase.loc")
+
+        // --- NUEVA LÓGICA DE NOMBRE CORRELATIVO ---
+        val archivosExistentes = storageDir.listFiles { f ->
+            f.name.startsWith("Evidencia ") && f.extension == "m4a"
+        } ?: arrayOf()
+
+        val ultimoNumero = archivosExistentes.mapNotNull { archivo ->
+            archivo.nameWithoutExtension
+                .replace("Evidencia ", "")
+                .toIntOrNull()
+        }.maxOrNull() ?: 0
+
+        val nuevoNombre = "Evidencia %02d".format(ultimoNumero + 1)
+        // ------------------------------------------
+
+        archivoAudio = File(storageDir, "$nuevoNombre.m4a")
+        val archivoLoc = File(storageDir, "$nuevoNombre.loc")
 
         // Captura de ubicación asíncrona con dirección + coordenadas exactas
         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
