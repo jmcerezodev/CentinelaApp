@@ -1,6 +1,6 @@
 package dev.jmcerezo.grabadoralegal.ui
 
-import androidx.compose.foundation.background // IMPORTACIÓN NECESARIA
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,14 +39,12 @@ fun TarjetaEvidencia(
         shape = RoundedCornerShape(16.dp)
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            // CONTENIDO PRINCIPAL
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onPlay() }
                     .padding(16.dp)
             ) {
-                // TÍTULO PROTAGONISTA
                 Text(
                     text = grabacion.archivo.nameWithoutExtension,
                     color = Color.White,
@@ -59,13 +57,17 @@ fun TarjetaEvidencia(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // DATOS SECUNDARIOS
                 DatoFila(etiqueta = "FECHA", valor = grabacion.fecha)
                 DatoFila(etiqueta = "ID", valor = grabacion.hash.take(16).uppercase())
-                DatoFila(etiqueta = "UBICACIÓN", valor = "Pendiente de GPS", esUbicacion = true)
+
+                // UBICACIÓN: Ahora permite múltiples líneas para Calle + GPS
+                DatoFila(
+                    etiqueta = "UBICACIÓN",
+                    valor = grabacion.ubicacion,
+                    esUbicacion = true
+                )
             }
 
-            // BOTÓN DE TRES PUNTOS
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -79,7 +81,6 @@ fun TarjetaEvidencia(
                     )
                 }
 
-                // MENÚ DESPLEGABLE CORREGIDO
                 DropdownMenu(
                     expanded = menuExpandido,
                     onDismissRequest = { menuExpandido = false },
@@ -88,27 +89,18 @@ fun TarjetaEvidencia(
                     DropdownMenuItem(
                         text = { Text("Renombrar", color = Color.White) },
                         leadingIcon = { Icon(Icons.Default.Edit, null, tint = Color.Gray) },
-                        onClick = {
-                            menuExpandido = false
-                            onRename()
-                        }
+                        onClick = { menuExpandido = false; onRename() }
                     )
                     DropdownMenuItem(
                         text = { Text("Compartir", color = Color.White) },
                         leadingIcon = { Icon(Icons.Default.Share, null, tint = Color.White) },
-                        onClick = {
-                            menuExpandido = false
-                            onShare()
-                        }
+                        onClick = { menuExpandido = false; onShare() }
                     )
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f)) // Actualizado de Divider
+                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.2f))
                     DropdownMenuItem(
                         text = { Text("Eliminar", color = Color(0xFFFF5252)) },
                         leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color(0xFFFF5252)) },
-                        onClick = {
-                            menuExpandido = false
-                            onDelete()
-                        }
+                        onClick = { menuExpandido = false; onDelete() }
                     )
                 }
             }
@@ -118,9 +110,10 @@ fun TarjetaEvidencia(
 
 @Composable
 fun DatoFila(etiqueta: String, valor: String, esUbicacion: Boolean = false) {
+    // Usamos Column para la ubicación si el texto es largo, o Row si es corto
     Row(
-        modifier = Modifier.padding(vertical = 1.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier = Modifier.padding(vertical = 2.dp),
+        verticalAlignment = if (esUbicacion) Alignment.Top else Alignment.CenterVertically
     ) {
         Text(
             text = "$etiqueta: ",
@@ -130,20 +123,28 @@ fun DatoFila(etiqueta: String, valor: String, esUbicacion: Boolean = false) {
             letterSpacing = 0.5.sp,
             modifier = Modifier.width(75.dp)
         )
-        if (esUbicacion) {
-            Icon(
-                Icons.Default.LocationOn,
-                null,
-                tint = Color.DarkGray,
-                modifier = Modifier.size(12.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (esUbicacion) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        null,
+                        tint = Color.DarkGray,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = valor,
+                    color = if (valor == "Ubicación no disponible") Color.DarkGray else Color.LightGray,
+                    fontSize = if (esUbicacion) 11.sp else 12.sp, // Un poco más pequeña si es GPS
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 16.sp,
+                    maxLines = 3, // Permitimos hasta 3 líneas
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
-        Text(
-            text = valor,
-            color = if (esUbicacion) Color.DarkGray else Color.LightGray,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Normal
-        )
     }
 }
