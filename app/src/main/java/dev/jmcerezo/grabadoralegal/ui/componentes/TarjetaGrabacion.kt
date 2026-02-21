@@ -1,7 +1,6 @@
-package dev.jmcerezo.grabadoralegal.ui
+package dev.jmcerezo.grabadoralegal.ui.componentes
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,11 +13,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jmcerezo.grabadoralegal.core.GrabadoraMotor
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 
 @Composable
-fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
+fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
     // Estado sincronizado con el motor
     var grabando by remember { mutableStateOf(gestorAudio.estaGrabando) }
 
@@ -26,32 +23,9 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()
-            .background(Color(0xFF0F111A)) // Azul Noche Profesional
-            .padding(horizontal = 24.dp) // Quitamos padding vertical para manejarlo con Insets
+            .background(Color(0xFF0F111A))
+            .padding(horizontal = 24.dp)
     ) {
-        // Cabecera con margen dinámico para la barra de notificaciones
-        Column(
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(top = 16.dp, bottom = 16.dp)
-        ) {
-            Text(
-                text = "CENTINELA",
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 4.sp
-            )
-
-            Text(
-                text = "Sistema de Protección",
-                color = Color.Gray,
-                fontSize = 14.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
         // Tarjeta de Estado Principal
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -90,7 +64,7 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                     }
                 }
 
-                // Botón de acción corregido
+                // Botón de acción REC/STOP
                 IconButton(
                     onClick = {
                         if (grabando) {
@@ -117,40 +91,6 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                     )
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Info Técnica
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            InfoCard(modifier = Modifier.weight(1f), title = "Encriptación", value = "SHA-256")
-            InfoCard(modifier = Modifier.weight(1f), title = "Formato", value = "M4A HQ")
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Título del Historial
-        Text(
-            text = "HISTORIAL RECIENTE",
-            color = Color.White,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-    }
-}
-
-@Composable
-fun InfoCard(modifier: Modifier, title: String, value: String) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1D2E)),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = title, color = Color.Gray, fontSize = 10.sp)
-            Text(text = value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
