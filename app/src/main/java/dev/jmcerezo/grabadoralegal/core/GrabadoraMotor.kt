@@ -115,6 +115,26 @@ class GrabadoraMotor(private val contexto: Context) {
         }
     }
 
+    // --- NUEVA FUNCIÓN PARA RENOMBRAR ARCHIVOS ---
+    fun renombrarGrabacion(archivoOriginal: File, nuevoNombre: String): Boolean {
+        return try {
+            // Limpiamos el nombre para evitar caracteres prohibidos en el sistema de archivos
+            val nombreLimpio = nuevoNombre.trim().replace(Regex("[^a-zA-Z0-9_\\- ]"), "_")
+            if (nombreLimpio.isEmpty()) return false
+
+            val nuevoArchivo = File(archivoOriginal.parent, "$nombreLimpio.m4a")
+
+            if (archivoOriginal.exists()) {
+                archivoOriginal.renameTo(nuevoArchivo)
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Log.e("Centinela", "Error al renombrar: ${e.message}")
+            false
+        }
+    }
+
     private fun liberarWakeLock() {
         if (wakeLock?.isHeld == true) wakeLock?.release()
         wakeLock = null

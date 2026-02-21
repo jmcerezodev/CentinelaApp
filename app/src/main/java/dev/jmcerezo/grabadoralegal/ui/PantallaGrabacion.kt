@@ -27,25 +27,30 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             .fillMaxWidth()
             .wrapContentHeight()
             .background(Color(0xFF0F111A)) // Azul Noche Profesional
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 24.dp) // Quitamos padding vertical para manejarlo con Insets
     ) {
-        // Cabecera Minimalista
-        Text(
-            text = "CENTINELA",
-            color = Color.White,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 4.sp,
-            modifier = Modifier.padding(top = 8.dp)
-        )
+        // Cabecera con margen dinámico para la barra de notificaciones
+        Column(
+            modifier = Modifier
+                .statusBarsPadding()
+                .padding(top = 16.dp, bottom = 16.dp)
+        ) {
+            Text(
+                text = "CENTINELA",
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 4.sp
+            )
 
-        Text(
-            text = "Sistema de Protección",
-            color = Color.Gray,
-            fontSize = 14.sp
-        )
+            Text(
+                text = "Sistema de Protección",
+                color = Color.Gray,
+                fontSize = 14.sp
+            )
+        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Tarjeta de Estado Principal
         Card(
@@ -89,15 +94,10 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                 IconButton(
                     onClick = {
                         if (grabando) {
-                            // 1. Detenemos la grabación
                             gestorAudio.detenerGrabacion()
-                            // 2. Sincronizamos el estado visual
                             grabando = false
-                            // 3. SOLO AHORA avisamos para que la lista se actualice
                             alVerArchivos()
                         } else {
-                            // Al iniciar, no llamamos a alVerArchivos()
-                            // para evitar que la lista se refresque antes de tiempo
                             gestorAudio.iniciarGrabacion()
                             grabando = true
                         }
@@ -135,7 +135,8 @@ fun PantallaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             color = Color.White,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
     }
 }

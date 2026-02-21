@@ -1,15 +1,19 @@
 package dev.jmcerezo.grabadoralegal
 
 import android.Manifest
+import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background // ESTA ES LA IMPORTACIÓN QUE FALTABA
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.jmcerezo.grabadoralegal.core.GrabadoraMotor
@@ -28,7 +32,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // Forzamos transparencia total y estilo oscuro para iconos blancos
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT)
+        )
         super.onCreate(savedInstanceState)
 
         solicitudPermisosLauncher.launch(
@@ -42,21 +50,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             val contexto = LocalContext.current
             val motor = remember { GrabadoraMotor(contexto) }
-
-            // Estado para forzar el refresco de la lista
             var refreshTrigger by remember { mutableIntStateOf(0) }
 
+            // Aplicamos el color de fondo aquí para que la barra transparente lo deje ver
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(Color(0xFF0F111A)) // Corregido: Ahora se reconoce gracias al import
                     .navigationBarsPadding()
             ) {
-                // 1. ZONA SUPERIOR: Panel de Control (Grabadora)
                 Box(modifier = Modifier.wrapContentHeight()) {
                     PantallaGrabacion(
                         gestorAudio = motor,
                         alVerArchivos = {
-                            // Incrementamos el disparador para avisar a la lista
                             refreshTrigger++
                         }
                     )
@@ -64,13 +70,11 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // 2. ZONA INFERIOR: Lista de Historial
-                // Usamos key(refreshTrigger) para forzar la recomposición cuando cambie
                 key(refreshTrigger) {
                     Box(modifier = Modifier.weight(1f)) {
                         PantallaListaArchivos(
                             gestorAudio = motor,
-                            alVolver = { /* Ya estamos en la misma pantalla */ }
+                            alVolver = { }
                         )
                     }
                 }
