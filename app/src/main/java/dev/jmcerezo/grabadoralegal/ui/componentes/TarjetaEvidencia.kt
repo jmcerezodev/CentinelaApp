@@ -27,7 +27,9 @@ fun TarjetaEvidencia(
     onDelete: () -> Unit
 ) {
     var menuExpandido by remember { mutableStateOf(false) }
-    var tarjetaDetallada by remember { mutableStateOf(false) }
+    // ESTADOS INDEPENDIENTES
+    var reproductorVisible by remember { mutableStateOf(false) }
+    var infoVisible by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -41,12 +43,13 @@ fun TarjetaEvidencia(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onPlay() }
+                    // El click en la tarjeta ahora controla el REPRODUCTOR
+                    .clickable { reproductorVisible = !reproductorVisible }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // TÍTULO Y FECHA RÁPIDA
+                // TÍTULO Y FECHA
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = grabacion.archivo.nameWithoutExtension,
@@ -65,16 +68,16 @@ fun TarjetaEvidencia(
 
                 // BOTONES DE ACCIÓN
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Botón para expandir info técnica (USANDO INFO EN LUGAR DE VISIBILITY)
-                    IconButton(onClick = { tarjetaDetallada = !tarjetaDetallada }) {
+                    // BOTÓN INFO (Controla solo los DATOS TÉCNICOS)
+                    IconButton(onClick = { infoVisible = !infoVisible }) {
                         Icon(
-                            imageVector = if (tarjetaDetallada) Icons.Default.KeyboardArrowUp else Icons.Default.Info,
+                            imageVector = Icons.Default.Info,
                             contentDescription = "Ver detalles",
-                            tint = if (tarjetaDetallada) Color(0xFF3D5AFE) else Color.Gray
+                            tint = if (infoVisible) Color(0xFF3D5AFE) else Color.Gray
                         )
                     }
 
-                    // Botón de menú (3 puntos)
+                    // BOTÓN MENÚ (3 PUNTOS)
                     Box {
                         IconButton(onClick = { menuExpandido = true }) {
                             Icon(
@@ -110,8 +113,20 @@ fun TarjetaEvidencia(
                 }
             }
 
-            // CONTENIDO TÉCNICO DESPLEGABLE
-            AnimatedVisibility(visible = tarjetaDetallada) {
+            // SECCIÓN 1: REPRODUCTOR (Se activa al tocar la tarjeta)
+            AnimatedVisibility(visible = reproductorVisible) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.1f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    ReproductorEvidencia(archivo = grabacion.archivo)
+                }
+            }
+
+            // SECCIÓN 2: INFORMACIÓN TÉCNICA (Se activa con el botón Info)
+            AnimatedVisibility(visible = infoVisible) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
