@@ -1,7 +1,13 @@
 package dev.jmcerezo.grabadoralegal.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -32,6 +38,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.Companion.dark(Color.TRANSPARENT),
@@ -59,6 +66,41 @@ class MainActivity : ComponentActivity() {
 
             // Función para refrescar la lista
             val actualizarLista = { listaGrabaciones = motor.obtenerGrabaciones() }
+
+            // --- ESCUCHADOR PARA GRABACIONES EXTERNAS (BOTONES) ---
+            LaunchedEffect(motor) {
+                motor.onActualizarLista = {
+                    actualizarLista()
+                }
+            }
+
+            // RECEPTOR DE BROADCAST (Radio interna para el servicio)
+            DisposableEffect(contexto) {
+                val receptor = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        actualizarLista()
+                    }
+                }
+
+                val filtro = IntentFilter("dev.jmcerezo.ACTUALIZAR_LISTA")
+                val appContext = contexto.applicationContext
+
+                // Registro blindado para evitar advertencias de Lint y errores de compilación
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    appContext.registerReceiver(receptor, filtro, Context.RECEIVER_NOT_EXPORTED)
+                } else {
+                    // En versiones anteriores, registramos de forma estándar.
+                    // El IDE podría seguir quejándose visualmente sin el @SuppressLint arriba.
+                    appContext.registerReceiver(receptor, filtro)
+                }
+
+                onDispose {
+                    try {
+                        appContext.unregisterReceiver(receptor)
+                    } catch (e: Exception) { }
+                }
+            }
+            // ------------------------------------------------------------
 
             Column(
                 modifier = Modifier

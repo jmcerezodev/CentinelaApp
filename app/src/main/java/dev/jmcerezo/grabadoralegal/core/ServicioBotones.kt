@@ -2,6 +2,7 @@ package dev.jmcerezo.grabadoralegal.core
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.Intent
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -16,25 +17,18 @@ class ServicioBotones : AccessibilityService() {
         super.onServiceConnected()
         motor = GrabadoraMotor(this)
 
-        // --- CONFIGURACIÓN BLINDADA PARA COMPILAR SIN ERRORES ---
+        // --- CONFIGURACIÓN MINIMISTA PARA EVITAR BLOQUEOS DE SISTEMA ---
         val info = serviceInfo ?: AccessibilityServiceInfo()
 
         info.apply {
-            // Usamos la constante directa para evitar errores de referencia
             eventTypes = AccessibilityServiceInfo.FEEDBACK_ALL_MASK
             feedbackType = AccessibilityServiceInfo.FEEDBACK_HAPTIC
             notificationTimeout = 100
 
-            // Flags indispensables para el S23 Ultra
-            flags = flags or
-                    AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS or
-                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
-                    AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+            flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
         }
 
         this.serviceInfo = info
-        // -------------------------------------------------------
-
         Log.d("Centinela", "Servicio de Accesibilidad Conectado y Configurado")
     }
 
@@ -42,7 +36,6 @@ class ServicioBotones : AccessibilityService() {
         val action = event.action
         val keyCode = event.keyCode
 
-        // Escuchamos el botón de Volumen Arriba (KEYCODE_VOLUME_UP)
         if (action == KeyEvent.ACTION_DOWN && keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             val tiempoActual = System.currentTimeMillis()
 
@@ -59,19 +52,25 @@ class ServicioBotones : AccessibilityService() {
                 Log.d("Centinela", "¡Disparando grabación!")
                 gestionarGrabacion()
                 contadorPulsaciones = 0
+                return true
             }
-
-            // Bloqueamos el evento para que no salga la UI de volumen
-            return true
         }
-
-        return super.onKeyEvent(event)
+        return false
     }
 
     private fun gestionarGrabacion() {
         try {
             if (motor.estaGrabando) {
                 motor.detenerGrabacion()
+
+                // --- CAMBIO PARA BLINDAR EL REFRESCO ---
+                // Usamos el nombre de acción único y especificamos el paquete
+                val intent = Intent("dev.jmcerezo.ACTUALIZAR_LISTA")
+                intent.setPackage(packageName)
+                sendBroadcast(intent)
+                Log.d("Centinela", "Aviso de refresco enviado: dev.jmcerezo.ACTUALIZAR_LISTA")
+                // ---------------------------------------
+
             } else {
                 motor.iniciarGrabacion()
             }

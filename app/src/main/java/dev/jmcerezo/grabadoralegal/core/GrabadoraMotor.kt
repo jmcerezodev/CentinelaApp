@@ -26,6 +26,10 @@ class GrabadoraMotor(private val contexto: Context) {
     private var archivoAudio: File? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
+    // --- NUEVO: Callback para avisar a la interfaz ---
+    var onActualizarLista: (() -> Unit)? = null
+    // ------------------------------------------------
+
     // GPS: Cliente de servicios de ubicación
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(contexto)
     private var ubicacionActual: String = "Ubicación no disponible"
@@ -140,7 +144,7 @@ class GrabadoraMotor(private val contexto: Context) {
         if (!estaGrabando) return ""
         estaGrabando = false
 
-        return try {
+        val resultado = try {
             val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
             @Suppress("DEPRECATION")
             val stopLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, "Grabadora:Detener")
@@ -163,6 +167,14 @@ class GrabadoraMotor(private val contexto: Context) {
             liberarWakeLock()
             "Error"
         }
+
+        // --- NUEVO: Ejecutar el aviso para que la UI se entere ---
+        Handler(Looper.getMainLooper()).post {
+            onActualizarLista?.invoke()
+        }
+        // --------------------------------------------------------
+
+        return resultado
     }
 
     fun renombrarGrabacion(archivoOriginal: File, nuevoNombre: String): Boolean {
