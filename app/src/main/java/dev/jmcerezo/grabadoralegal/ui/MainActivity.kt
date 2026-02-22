@@ -2,12 +2,7 @@ package dev.jmcerezo.grabadoralegal.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Color
-import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -21,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.jmcerezo.grabadoralegal.core.GrabadoraMotor
 import dev.jmcerezo.grabadoralegal.model.GrabacionDato
 import dev.jmcerezo.grabadoralegal.ui.componentes.*
@@ -57,50 +53,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val contexto = LocalContext.current
             val motor = remember { GrabadoraMotor(contexto) }
+            val viewModel: GrabacionViewModel = viewModel()
 
-            // ESTADOS DE LA UI
-            var listaGrabaciones by remember { mutableStateOf(motor.obtenerGrabaciones()) }
+            // ESTADOS DE LA UI OBSERVANDO AL VIEWMODEL
+            val listaGrabaciones by viewModel.todasLasGrabaciones.collectAsState()
+            
             var mostrarInfoTecnica by remember { mutableStateOf(false) }
             var archivoParaEliminar by remember { mutableStateOf<GrabacionDato?>(null) }
             var archivoParaRenombrar by remember { mutableStateOf<GrabacionDato?>(null) }
-
-            // Función para refrescar la lista
-            val actualizarLista = { listaGrabaciones = motor.obtenerGrabaciones() }
-
-            // --- ESCUCHADOR PARA GRABACIONES EXTERNAS (BOTONES) ---
-            LaunchedEffect(motor) {
-                motor.onActualizarLista = {
-                    actualizarLista()
-                }
-            }
-
-            // RECEPTOR DE BROADCAST (Radio interna para el servicio)
-            DisposableEffect(contexto) {
-                val receptor = object : BroadcastReceiver() {
-                    override fun onReceive(context: Context?, intent: Intent?) {
-                        actualizarLista()
-                    }
-                }
-
-                val filtro = IntentFilter("dev.jmcerezo.ACTUALIZAR_LISTA")
-                val appContext = contexto.applicationContext
-
-                // Registro blindado para evitar advertencias de Lint y errores de compilación
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    appContext.registerReceiver(receptor, filtro, Context.RECEIVER_NOT_EXPORTED)
-                } else {
-                    // En versiones anteriores, registramos de forma estándar.
-                    // El IDE podría seguir quejándose visualmente sin el @SuppressLint arriba.
-                    appContext.registerReceiver(receptor, filtro)
-                }
-
-                onDispose {
-                    try {
-                        appContext.unregisterReceiver(receptor)
-                    } catch (e: Exception) { }
-                }
-            }
-            // ------------------------------------------------------------
 
             Column(
                 modifier = Modifier
@@ -109,37 +69,35 @@ class MainActivity : ComponentActivity() {
                     .navigationBarsPadding()
                     .statusBarsPadding()
             ) {
-                // 1. CABECERA PRINCIPAL (Identidad: CENTINELA + Botón Info Técnica)
                 TopBarApp(onInfoClick = { mostrarInfoTecnica = true })
 
-                // 2. TARJETA DE CONTROL DE GRABACIÓN
                 Box(modifier = Modifier.wrapContentHeight()) {
                     TarjetaGrabacion(
                         gestorAudio = motor,
-                        alVerArchivos = { actualizarLista() }
+                        alVerArchivos = { /* Room se encarga del refresco automático */ }
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 3. SECCIÓN DE HISTORIAL (Título limpio)
                 TopBarHistorial()
 
-                // 4. LISTA DE EVIDENCIAS
                 Box(modifier = Modifier.weight(1f)) {
                     ListaEvidencias(
                         lista = listaGrabaciones,
                         onPlay = { grabacion ->
-                            motor.reproducirAudio(grabacion.archivo)
+                            motor.reproducirAudio(grabacion)
                             Toast.makeText(contexto, "Reproduciendo...", Toast.LENGTH_SHORT).show()
                         },
                         onRename = { grabacion -> archivoParaRenombrar = grabacion },
                         onShare = { grabacion -> motor.compartirArchivo(grabacion) },
-                        onDelete = { grabacion -> archivoParaEliminar = grabacion }
+                        onDelete = { grabacion -> archivoParaEliminar = grabacion },
+                        onToggleFavorite = { grabacion ->
+                            viewModel.actualizar(grabacion.copy(esFavorito = !grabacion.esFavorito))
+                        }
                     )
                 }
 
-                // 5. PIE DE PÁGINA
                 FooterApp()
             }
 
@@ -151,10 +109,9 @@ class MainActivity : ComponentActivity() {
 
             archivoParaEliminar?.let { grabacion ->
                 DialogoEliminar(
-                    nombreArchivo = grabacion.archivo.nameWithoutExtension,
+                    nombreArchivo = grabacion.nombre,
                     onConfirm = {
-                        motor.eliminarGrabacion(grabacion.archivo)
-                        actualizarLista()
+                        motor.eliminarGrabacion(grabacion)
                         archivoParaEliminar = null
                     },
                     onDismiss = { archivoParaEliminar = null }
@@ -163,10 +120,9 @@ class MainActivity : ComponentActivity() {
 
             archivoParaRenombrar?.let { grabacion ->
                 DialogoRenombrar(
-                    nombreActual = grabacion.archivo.nameWithoutExtension,
+                    nombreActual = grabacion.nombre,
                     onConfirm = { nuevoNombre ->
-                        motor.renombrarGrabacion(grabacion.archivo, nuevoNombre)
-                        actualizarLista()
+                        motor.renombrarGrabacion(grabacion, nuevoNombre)
                         archivoParaRenombrar = null
                     },
                     onDismiss = { archivoParaRenombrar = null }

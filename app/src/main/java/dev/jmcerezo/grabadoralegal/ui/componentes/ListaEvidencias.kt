@@ -21,16 +21,14 @@ fun ListaEvidencias(
     onPlay: (GrabacionDato) -> Unit,
     onRename: (GrabacionDato) -> Unit,
     onShare: (GrabacionDato) -> Unit,
-    onDelete: (GrabacionDato) -> Unit
+    onDelete: (GrabacionDato) -> Unit,
+    onToggleFavorite: (GrabacionDato) -> Unit
 ) {
-    // Estado para recordar qué archivos son favoritos (por su nombre único)
-    var favoritos by remember { mutableStateOf(setOf<String>()) }
-
-    // Ordenamos la lista: primero favoritos, luego por fecha (o el orden original)
-    val listaOrdenada = remember(lista, favoritos) {
+    // Ordenamos la lista: primero favoritos, luego por fecha (ID descendente)
+    val listaOrdenada = remember(lista) {
         lista.sortedWith(
-            compareByDescending<GrabacionDato> { favoritos.contains(it.archivo.name) }
-                .thenByDescending { it.archivo.lastModified() }
+            compareByDescending<GrabacionDato> { it.esFavorito }
+                .thenByDescending { it.id }
         )
     }
 
@@ -58,20 +56,12 @@ fun ListaEvidencias(
             ) {
                 items(
                     items = listaOrdenada,
-                    key = { it.archivo.name } // Importante para animaciones suaves
+                    key = { it.rutaArchivo }
                 ) { grabacion ->
-                    val esFavorito = favoritos.contains(grabacion.archivo.name)
-
                     TarjetaEvidencia(
                         grabacion = grabacion,
-                        estaMarcado = esFavorito,
-                        onToggleFavorite = {
-                            favoritos = if (esFavorito) {
-                                favoritos - grabacion.archivo.name
-                            } else {
-                                favoritos + grabacion.archivo.name
-                            }
-                        },
+                        estaMarcado = grabacion.esFavorito,
+                        onToggleFavorite = { onToggleFavorite(grabacion) },
                         onPlay = { onPlay(grabacion) },
                         onRename = { onRename(grabacion) },
                         onShare = { onShare(grabacion) },

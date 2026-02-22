@@ -1,12 +1,15 @@
 package dev.jmcerezo.grabadoralegal.model
 
-import java.io.File
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
-// Esta clase guardará la información de cada audio, incluyendo su contexto geográfico
+@Entity(tableName = "grabaciones")
 data class GrabacionDato(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val nombre: String,
-    val archivo: File,
+    val rutaArchivo: String,
     val fecha: String,
     val hash: String,
-    val ubicacion: String = "Ubicación no disponible" // Campo nuevo para el GPS
+    val ubicacion: String = "Ubicación no disponible",
+    val esFavorito: Boolean = false
 )

@@ -12,7 +12,11 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import dev.jmcerezo.grabadoralegal.model.AppDatabase
 import dev.jmcerezo.grabadoralegal.model.GrabacionDato
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
@@ -25,6 +29,10 @@ class GrabadoraMotor(private val contexto: Context) {
     private var reproductor: MediaPlayer? = null
     private var archivoAudio: File? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    
+    private val db = AppDatabase.getDatabase(contexto)
+    private val dao = db.grabacionDao()
+    private val scope = CoroutineScope(Dispatchers.IO)
 
     // --- NUEVO: Callback para avisar a la interfaz ---
     var onActualizarLista: (() -> Unit)? = null
@@ -66,9 +74,11 @@ class GrabadoraMotor(private val contexto: Context) {
         // ------------------------------------------
 
         archivoAudio = File(storageDir, "$nuevoNombre.m4a")
-        val archivoLoc = File(storageDir, "$nuevoNombre.loc")
+        
+        // Reseteamos la ubicación antes de empezar para no usar la de la grabación anterior
+        ubicacionActual = "Ubicación no disponible"
 
-        // Captura de ubicación asíncrona con dirección + coordenadas exactas
+        // Captura de ubicación asíncrona
         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
             .addOnSuccessListener { location ->
                 if (location != null) {
@@ -78,17 +88,12 @@ class GrabadoraMotor(private val contexto: Context) {
                         val coordenadasPuras = "${location.latitude}, ${location.longitude}"
 
                         ubicacionActual = if (!direcciones.isNullOrEmpty()) {
-                            // Combinamos dirección aproximada con coordenadas exactas
                             "${direcciones[0].getAddressLine(0)} | GPS: $coordenadasPuras"
                         } else {
                             "GPS: $coordenadasPuras"
                         }
                     } catch (e: Exception) {
                         ubicacionActual = "GPS: ${location.latitude}, ${location.longitude}"
-                    }
-                    // Actualización del archivo de metadatos con el dato completo
-                    if (archivoLoc.exists()) {
-                        archivoLoc.writeText(ubicacionActual)
                     }
                 }
             }
@@ -130,9 +135,6 @@ class GrabadoraMotor(private val contexto: Context) {
 
             estaGrabando = true
 
-            // Creamos el archivo inicial
-            archivoLoc.writeText(ubicacionActual)
-
         } catch (e: Exception) {
             estaGrabando = false
             liberarWakeLock()
@@ -144,7 +146,10 @@ class GrabadoraMotor(private val contexto: Context) {
         if (!estaGrabando) return ""
         estaGrabando = false
 
-        val resultado = try {
+        // Guardamos la ubicación capturada en una variable local para el closure del scope.launch
+        val ubicacionParaGuardar = ubicacionActual
+
+        val hash = try {
             val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
             @Suppress("DEPRECATION")
             val stopLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, "Grabadora:Detener")
@@ -160,9 +165,27 @@ class GrabadoraMotor(private val contexto: Context) {
             vibrar(longArrayOf(0, 100, 50, 100))
             liberarWakeLock()
 
-            val hash = archivoAudio?.let { generarHashSHA256(it) } ?: "Error"
-            ubicacionActual = "Ubicación no disponible"
-            hash
+            val generado = archivoAudio?.let { generarHashSHA256(it) } ?: "Error"
+            
+            // GUARDAR EN BASE DE DATOS
+            archivoAudio?.let { file ->
+                val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(file.lastModified())
+                val nombreArchivo = file.nameWithoutExtension
+                val ruta = file.absolutePath
+                
+                scope.launch {
+                    val nuevaGrabacion = GrabacionDato(
+                        nombre = nombreArchivo,
+                        rutaArchivo = ruta,
+                        fecha = fechaActual,
+                        hash = generado,
+                        ubicacion = ubicacionParaGuardar
+                    )
+                    dao.insert(nuevaGrabacion)
+                }
+            }
+            
+            generado
         } catch (e: Exception) {
             liberarWakeLock()
             "Error"
@@ -174,42 +197,37 @@ class GrabadoraMotor(private val contexto: Context) {
         }
         // --------------------------------------------------------
 
-        return resultado
+        return hash
     }
 
-    fun renombrarGrabacion(archivoOriginal: File, nuevoNombre: String): Boolean {
-        return try {
-            val nombreLimpio = nuevoNombre.trim().replace(Regex("[^a-zA-Z0-9_\\- ]"), "_")
-            if (nombreLimpio.isEmpty()) return false
-
-            val nuevoArchivo = File(archivoOriginal.parent, "$nombreLimpio.m4a")
-            val nuevoArchivoLoc = File(archivoOriginal.parent, "$nombreLimpio.loc")
-
-            val archivoLocOriginal = File(archivoOriginal.absolutePath.replace(".m4a", ".loc"))
-            if (archivoLocOriginal.exists()) archivoLocOriginal.renameTo(nuevoArchivoLoc)
-
-            if (archivoOriginal.exists()) {
-                archivoOriginal.renameTo(nuevoArchivo)
-            } else false
-        } catch (e: Exception) {
-            false
+    fun eliminarGrabacion(grabacion: GrabacionDato) {
+        scope.launch {
+            val archivo = File(grabacion.rutaArchivo)
+            if (archivo.exists()) archivo.delete()
+            dao.delete(grabacion)
         }
     }
 
-    fun obtenerGrabaciones(): List<GrabacionDato> {
-        val archivos = contexto.filesDir.listFiles { _, nombre -> nombre.endsWith(".m4a") } ?: arrayOf()
-        return archivos.map { file ->
-            val archivoLoc = File(file.absolutePath.replace(".m4a", ".loc"))
-            val locData = if (archivoLoc.exists()) archivoLoc.readText() else "Ubicación no disponible"
+    fun renombrarGrabacion(grabacion: GrabacionDato, nuevoNombre: String) {
+        scope.launch {
+            try {
+                val nombreLimpio = nuevoNombre.trim().replace(Regex("[^a-zA-Z0-9_\\- ]"), "_")
+                if (nombreLimpio.isEmpty()) return@launch
 
-            GrabacionDato(
-                nombre = file.name,
-                archivo = file,
-                fecha = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(file.lastModified()),
-                hash = generarHashSHA256(file),
-                ubicacion = locData
-            )
-        }.sortedByDescending { it.archivo.lastModified() }
+                val archivoOriginal = File(grabacion.rutaArchivo)
+                val nuevoArchivo = File(archivoOriginal.parent, "$nombreLimpio.m4a")
+
+                if (archivoOriginal.exists() && archivoOriginal.renameTo(nuevoArchivo)) {
+                    val grabacionActualizada = grabacion.copy(
+                        nombre = nombreLimpio,
+                        rutaArchivo = nuevoArchivo.absolutePath
+                    )
+                    dao.update(grabacionActualizada)
+                }
+            } catch (e: Exception) {
+                Log.e("Centinela", "Error al renombrar: ${e.message}")
+            }
+        }
     }
 
     private fun liberarWakeLock() {
@@ -232,14 +250,11 @@ class GrabadoraMotor(private val contexto: Context) {
         } catch (e: Exception) { }
     }
 
-    fun eliminarGrabacion(archivo: File): Boolean = try {
-        val archivoLoc = File(archivo.absolutePath.replace(".m4a", ".loc"))
-        if (archivoLoc.exists()) archivoLoc.delete()
-        if (archivo.exists()) archivo.delete() else false
-    } catch (e: Exception) { false }
-
     fun compartirArchivo(grabacion: GrabacionDato) {
-        val uri = FileProvider.getUriForFile(contexto, "${contexto.packageName}.fileprovider", grabacion.archivo)
+        val archivo = File(grabacion.rutaArchivo)
+        if (!archivo.exists()) return
+        
+        val uri = FileProvider.getUriForFile(contexto, "${contexto.packageName}.fileprovider", archivo)
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "audio/mp4"
             putExtra(Intent.EXTRA_STREAM, uri)
@@ -248,7 +263,10 @@ class GrabadoraMotor(private val contexto: Context) {
         contexto.startActivity(Intent.createChooser(intent, "Compartir..."))
     }
 
-    fun reproducirAudio(archivo: File) {
+    fun reproducirAudio(grabacion: GrabacionDato) {
+        val archivo = File(grabacion.rutaArchivo)
+        if (!archivo.exists()) return
+        
         detenerReproduccion()
         reproductor = MediaPlayer().apply {
             setDataSource(archivo.absolutePath)

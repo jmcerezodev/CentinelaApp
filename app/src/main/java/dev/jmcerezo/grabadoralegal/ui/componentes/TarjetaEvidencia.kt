@@ -17,12 +17,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jmcerezo.grabadoralegal.model.GrabacionDato
+import java.io.File
 
 @Composable
 fun TarjetaEvidencia(
     grabacion: GrabacionDato,
-    estaMarcado: Boolean, // Nuevo: Recibe el estado de la lista
-    onToggleFavorite: () -> Unit, // Nuevo: Avisa que queremos cambiar el estado
+    estaMarcado: Boolean,
+    onToggleFavorite: () -> Unit,
     onPlay: () -> Unit,
     onRename: () -> Unit,
     onShare: () -> Unit,
@@ -50,7 +51,7 @@ fun TarjetaEvidencia(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = grabacion.archivo.nameWithoutExtension,
+                            text = grabacion.nombre,
                             color = Color.White,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
@@ -148,7 +149,7 @@ fun TarjetaEvidencia(
                         .background(Color.Black.copy(alpha = 0.1f))
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    ReproductorEvidencia(archivo = grabacion.archivo)
+                    ReproductorEvidencia(archivo = File(grabacion.rutaArchivo))
                 }
             }
 
