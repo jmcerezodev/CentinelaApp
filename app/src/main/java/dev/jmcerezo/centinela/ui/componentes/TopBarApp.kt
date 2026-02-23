@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -32,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import dev.jmcerezo.centinela.core.ServicioBotones
+import dev.jmcerezo.centinela.core.service.ServicioBotones
 
 @Composable
 fun TopBarApp(onInfoClick: () -> Unit) {
@@ -50,10 +51,11 @@ fun TopBarApp(onInfoClick: () -> Unit) {
     var ubicacion by remember { mutableStateOf(false) }
     var notificaciones by remember { mutableStateOf(false) }
 
-    val todosLosPermisosOk = accesibilidad && superposicion && bateria && microfono && ubicacion && (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificaciones else true)
+    val todosLosPermisosOk = accesibilidad && superposicion && bateria && microfono && ubicacion && 
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificaciones else true)
 
     val actualizarEstados = {
-        accesibilidad = isAccessibilityServiceEnabled(contexto, ServicioBotones::class.java)
+        accesibilidad = isAccessibilityServiceEnabledLocal(contexto, ServicioBotones::class.java)
         superposicion = Settings.canDrawOverlays(contexto)
         val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
         bateria = pm.isIgnoringBatteryOptimizations(contexto.packageName)
@@ -107,43 +109,43 @@ fun TopBarApp(onInfoClick: () -> Unit) {
             title = { Text("Estado de Seguridad", color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Configura los permisos para garantizar que el sistema pueda capturar evidencias en cualquier situación.", color = Color.Gray, fontSize = 12.sp)
+                    Text("Configura los permisos necesarios para el correcto funcionamiento del sistema.", color = Color.Gray, fontSize = 12.sp)
                     
-                    PermisoFilaAppBar("Micrófono", microfono) {
+                    PermisoRenglonAppBar("Micrófono", microfono) {
                         infoPermiso = PermisoDetalle(
                             "Permiso de Micrófono",
                             "Es la base del sistema. Permite capturar el audio de las evidencias con alta fidelidad.",
                             "Poder registrar lo que sucede a tu alrededor cuando activas la grabación.",
                             listOf("Se abrirá la configuración de la aplicación.", "Entra en el apartado 'Permisos'.", "Asegúrate de que 'Micrófono' esté en 'Permitir'."),
-                            { abrirAjustesApp(contexto) }
+                            { abrirAjustesAppLocal(contexto) }
                         )
                     }
 
-                    PermisoFilaAppBar("Ubicación (GPS)", ubicacion) {
+                    PermisoRenglonAppBar("Ubicación (GPS)", ubicacion) {
                         infoPermiso = PermisoDetalle(
                             "Permiso de Ubicación",
                             "Añade validez legal a tus grabaciones al certificar exactamente dónde se han realizado.",
                             "Vincular cada audio con coordenadas GPS precisas y dirección física.",
                             listOf("Entra en el apartado 'Permisos'.", "Selecciona 'Ubicación'.", "Elige 'Permitir solo si la aplicación está en uso'."),
-                            { abrirAjustesApp(contexto) }
+                            { abrirAjustesAppLocal(contexto) }
                         )
                     }
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        PermisoFilaAppBar("Notificaciones", notificaciones) {
+                        PermisoRenglonAppBar("Notificaciones", notificaciones) {
                             infoPermiso = PermisoDetalle(
                                 "Permiso de Notificaciones",
                                 "Permite que el servicio de seguridad sea visible y no sea cerrado por Android.",
                                 "Mantener el sistema de escucha activo permanentemente en la barra de estado.",
                                 listOf("Entra en el apartado 'Notificaciones'.", "Activa el interruptor de 'Todas las notificaciones de Centinela'."),
-                                { abrirAjustesApp(contexto) }
+                                { abrirAjustesAppLocal(contexto) }
                             )
                         }
                     }
 
                     HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
 
-                    PermisoFilaAppBar("Accesibilidad", accesibilidad) {
+                    PermisoRenglonAppBar("Accesibilidad", accesibilidad) {
                         infoPermiso = PermisoDetalle(
                             "Servicio de Accesibilidad",
                             "Permite a Centinela detectar las pulsaciones de volumen incluso bloqueado.",
@@ -152,7 +154,7 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                             { contexto.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
                         )
                     }
-                    PermisoFilaAppBar("Aparecer encima", superposicion) {
+                    PermisoRenglonAppBar("Aparecer encima", superposicion) {
                         infoPermiso = PermisoDetalle(
                             "Mostrar sobre otras apps",
                             "Permite que el proceso de grabación no sea interrumpido por el bloqueo de pantalla o el sistema.",
@@ -161,7 +163,7 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                             { contexto.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${contexto.packageName}"))) }
                         )
                     }
-                    PermisoFilaAppBar("Gestión de Batería", bateria) {
+                    PermisoRenglonAppBar("Gestión de Batería", bateria) {
                         infoPermiso = PermisoDetalle(
                             "Optimización de Energía",
                             "Evita que Android cierre la aplicación automáticamente para ahorrar batería.",
@@ -184,8 +186,14 @@ fun TopBarApp(onInfoClick: () -> Unit) {
             title = { Text(info.titulo, color = Color.White, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SeccionInfo("Función", info.funcion)
-                    SeccionInfo("Por qué es necesario", info.porQue)
+                    Column {
+                        Text("FUNCIÓN", color = Color(0xFF3D5AFE), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                        Text(info.funcion, color = Color.LightGray, fontSize = 13.sp, lineHeight = 18.sp)
+                    }
+                    Column {
+                        Text("NECESIDAD", color = Color(0xFF3D5AFE), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                        Text(info.porQue, color = Color.LightGray, fontSize = 13.sp, lineHeight = 18.sp)
+                    }
                     
                     Column(modifier = Modifier.background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(12.dp)) {
                         Text("PASOS A SEGUIR:", color = Color(0xFF3D5AFE), fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
@@ -210,7 +218,7 @@ fun TopBarApp(onInfoClick: () -> Unit) {
     }
 }
 
-private fun abrirAjustesApp(context: Context) {
+private fun abrirAjustesAppLocal(context: Context) {
     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
         data = Uri.parse("package:${context.packageName}")
     }
@@ -218,15 +226,7 @@ private fun abrirAjustesApp(context: Context) {
 }
 
 @Composable
-fun SeccionInfo(label: String, contenido: String) {
-    Column {
-        Text(label.uppercase(), color = Color(0xFF3D5AFE), fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-        Text(contenido, color = Color.LightGray, fontSize = 13.sp, lineHeight = 18.sp)
-    }
-}
-
-@Composable
-fun PermisoFilaAppBar(nombre: String, activado: Boolean, onClick: () -> Unit) {
+fun PermisoRenglonAppBar(nombre: String, activado: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable { onClick() }.background(Color(0xFF25293D), RoundedCornerShape(8.dp)).padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -243,7 +243,7 @@ fun PermisoFilaAppBar(nombre: String, activado: Boolean, onClick: () -> Unit) {
 
 data class PermisoDetalle(val titulo: String, val funcion: String, val porQue: String, val pasos: List<String>, val accion: () -> Unit)
 
-fun isAccessibilityServiceEnabled(context: Context, service: Class<out AccessibilityService>): Boolean {
+fun isAccessibilityServiceEnabledLocal(context: Context, service: Class<out AccessibilityService>): Boolean {
     val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
     val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
     return enabledServices.any { it.resolveInfo.serviceInfo.packageName == context.packageName && it.resolveInfo.serviceInfo.name == service.name }

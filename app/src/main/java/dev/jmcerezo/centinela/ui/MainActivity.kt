@@ -17,14 +17,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dev.jmcerezo.centinela.core.GrabadoraMotor
-import dev.jmcerezo.centinela.model.GrabacionDato
+import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
+import dev.jmcerezo.centinela.data.local.db.GrabacionDato
 import dev.jmcerezo.centinela.ui.componentes.*
 import dev.jmcerezo.centinela.ui.componentes.dialogos.*
 import dev.jmcerezo.centinela.ui.theme.CentinelaTheme
 
+/**
+ * Actividad principal de la aplicación Centinela.
+ * Gestiona la solicitud de permisos críticos y sirve como contenedor para la interfaz de Compose.
+ */
 class MainActivity : ComponentActivity() {
 
+    // Launcher para solicitar los permisos necesarios para la captura legal
     private val solicitudPermisosLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { resultados ->
@@ -37,12 +42,14 @@ class MainActivity : ComponentActivity() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Configuración de pantalla completa y barras transparentes
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.Companion.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.Companion.dark(Color.TRANSPARENT)
         )
         super.onCreate(savedInstanceState)
 
+        // Lanzamos la solicitud de permisos al arrancar
         solicitudPermisosLauncher.launch(
             arrayOf(
                 Manifest.permission.RECORD_AUDIO,
@@ -57,9 +64,10 @@ class MainActivity : ComponentActivity() {
                 val motor = remember { GrabadoraMotor(contexto) }
                 val viewModel: GrabacionViewModel = viewModel()
 
-                // ESTADOS DE LA UI OBSERVANDO AL VIEWMODEL
+                // Observamos la lista de grabaciones desde Room
                 val listaGrabaciones by viewModel.todasLasGrabaciones.collectAsState()
                 
+                // Estados para la gestión de diálogos
                 var mostrarInfoTecnica by remember { mutableStateOf(false) }
                 var archivoParaEliminar by remember { mutableStateOf<GrabacionDato?>(null) }
                 var archivoParaRenombrar by remember { mutableStateOf<GrabacionDato?>(null) }
@@ -71,19 +79,23 @@ class MainActivity : ComponentActivity() {
                         .navigationBarsPadding()
                         .statusBarsPadding()
                 ) {
+                    // Cabecera con estado de permisos e info técnica
                     TopBarApp(onInfoClick = { mostrarInfoTecnica = true })
 
+                    // Control de grabación y ajustes avanzados
                     Box(modifier = Modifier.wrapContentHeight()) {
                         TarjetaGrabacion(
                             gestorAudio = motor,
-                            alVerArchivos = { /* Room se encarga del refresco automático */ }
+                            alVerArchivos = { /* Room refresca automáticamente vía Flow */ }
                         )
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Título de la sección de historial
                     TopBarHistorial()
 
+                    // Lista reactiva de evidencias
                     Box(modifier = Modifier.weight(1f)) {
                         ListaEvidencias(
                             lista = listaGrabaciones,
@@ -100,11 +112,11 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    // Pie de página con créditos
                     FooterApp()
                 }
 
-                // --- GESTIÓN DE DIÁLOGOS ---
-
+                // GESTIÓN DINÁMICA DE DIÁLOGOS
                 if (mostrarInfoTecnica) {
                     DialogoInfoTecnica(onDismiss = { mostrarInfoTecnica = false })
                 }

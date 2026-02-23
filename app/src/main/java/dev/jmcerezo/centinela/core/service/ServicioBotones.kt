@@ -1,7 +1,8 @@
-package dev.jmcerezo.centinela.core
+package dev.jmcerezo.centinela.core.service
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -15,12 +16,21 @@ import android.media.AudioTrack
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.*
-import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.app.NotificationCompat
-import dev.jmcerezo.centinela.R
+import androidx.core.content.ContextCompat
+import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
+import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 
+/**
+ * SERVICIO DE ACCESIBILIDAD: CENTINELA
+ * 
+ * Responsabilidad: Detectar las pulsaciones de los botones físicos de volumen.
+ * Este servicio implementa múltiples estrategias para evitar que Android suspenda 
+ * la escucha cuando la pantalla se apaga.
+ */
+@SuppressLint("AccessibilityService")
 class ServicioBotones : AccessibilityService() {
 
     private lateinit var motor: GrabadoraMotor
@@ -46,10 +56,7 @@ class ServicioBotones : AccessibilityService() {
                     if (streamType == AudioManager.STREAM_MUSIC) {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
-                        
-                        if (nuevoVol > antiguoVol) {
-                            registrarPulsacion("SISTEMA")
-                        }
+                        if (nuevoVol > antiguoVol) registrarPulsacion()
                         
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
@@ -64,8 +71,8 @@ class ServicioBotones : AccessibilityService() {
         super.onServiceConnected()
         motor = GrabadoraMotor(this)
         prefs = Preferencias(this)
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        powerManager = getSystemService(POWER_SERVICE) as PowerManager
 
         val info = serviceInfo ?: AccessibilityServiceInfo()
         info.apply {
@@ -83,11 +90,7 @@ class ServicioBotones : AccessibilityService() {
             addAction(Intent.ACTION_SCREEN_OFF)
         }
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(receiver, filter)
-        }
+        ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         actualizarEstadoServicio()
     }
@@ -242,14 +245,14 @@ class ServicioBotones : AccessibilityService() {
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                registrarPulsacion("FISICO")
+                registrarPulsacion()
             }
             return false 
         }
         return false
     }
 
-    private fun registrarPulsacion(origen: String) {
+    private fun registrarPulsacion() {
         val tiempoActual = System.currentTimeMillis()
         if (tiempoActual - ultimaPulsacionProcesada < 100) return
         ultimaPulsacionProcesada = tiempoActual

@@ -13,8 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jmcerezo.centinela.model.GrabacionDato
+import dev.jmcerezo.centinela.data.local.db.GrabacionDato
 
+/**
+ * Componente que muestra el historial de grabaciones en una lista vertical.
+ * Implementa la lógica de ordenación (favoritos primero e ID descendente).
+ */
 @Composable
 fun ListaEvidencias(
     lista: List<GrabacionDato>,
@@ -24,6 +28,7 @@ fun ListaEvidencias(
     onDelete: (GrabacionDato) -> Unit,
     onToggleFavorite: (GrabacionDato) -> Unit
 ) {
+    // La lista se reordena automáticamente cuando cambian los datos o el estado de favoritos
     val listaOrdenada = remember(lista) {
         lista.sortedWith(
             compareByDescending<GrabacionDato> { it.esFavorito }
@@ -55,7 +60,7 @@ fun ListaEvidencias(
             ) {
                 items(
                     items = listaOrdenada,
-                    key = { it.rutaArchivo }
+                    key = { it.rutaArchivo } // Clave única para optimizar el rendimiento del LazyColumn
                 ) { grabacion ->
                     TarjetaEvidencia(
                         grabacion = grabacion,

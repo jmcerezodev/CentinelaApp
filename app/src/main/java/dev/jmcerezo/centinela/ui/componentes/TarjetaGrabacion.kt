@@ -23,24 +23,38 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jmcerezo.centinela.core.GrabadoraMotor
-import dev.jmcerezo.centinela.core.Preferencias
+import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
+import dev.jmcerezo.centinela.data.local.prefs.Preferencias
+import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 
+/**
+ * Componente principal de control de grabación.
+ * Gestiona el inicio/parada de la grabadora y los ajustes de servicio en segundo plano.
+ * 
+ * @param gestorAudio Instancia del motor de grabación.
+ * @param alVerArchivos Callback ejecutado al detener una grabación.
+ */
 @Composable
 fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
     val contexto = LocalContext.current
     val prefs = remember { Preferencias(contexto) }
     
+    // Estados locales sincronizados con el hardware y preferencias
     var grabando by remember { mutableStateOf(gestorAudio.estaGrabando) }
     var servicioPermanente by remember { mutableStateOf(prefs.servicioPermanente) }
     var modoSilencioso by remember { mutableStateOf(prefs.modoSilencioso) }
 
+    // Estados para la gestión de la UI desplegable
     var mostrarAjustes by remember { mutableStateOf(false) }
     var mostrarInfoPermanente by remember { mutableStateOf(false) }
     var mostrarInfoAntiSuspension by remember { mutableStateOf(false) }
 
-    val rotacionIcono by animateFloatAsState(if (mostrarAjustes) 180f else 0f, label = "")
+    val rotacionIcono by animateFloatAsState(if (mostrarAjustes) 180f else 0f, label = "rotacion_flecha")
 
+    /**
+     * Envía una señal al Servicio de Accesibilidad para que actualice su configuración
+     * basándose en las nuevas preferencias guardadas.
+     */
     val actualizarServicio = {
         contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").apply {
             setPackage(contexto.packageName)
@@ -60,7 +74,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             shape = RoundedCornerShape(24.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                // Fila Principal: REC / STOP
+                // FILA SUPERIOR: Estado del sistema y botón de acción principal
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -91,6 +105,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                         }
                     }
 
+                    // Botón circular REC / STOP
                     IconButton(
                         onClick = {
                             if (grabando) {
@@ -120,7 +135,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Botón Desplegable de Ajustes
+                // SECCIÓN DESPLEGABLE: Configuración Avanzada
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -132,12 +147,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            Icons.Default.Settings,
-                            null,
-                            tint = Color.Gray,
-                            modifier = Modifier.size(14.dp)
-                        )
+                        Icon(Icons.Default.Settings, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             "CONFIGURACIÓN AVANZADA",
@@ -162,10 +172,10 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                             color = Color.Gray.copy(alpha = 0.1f)
                         )
 
-                        // MODO: SERVICIO PERMANENTE
+                        // Ajuste: Servicio Permanente
                         FilaAjusteConInfo(
                             titulo = "Servicio Permanente",
-                            subtitulo = "Evita el cierre de la app",
+                            subtitulo = "Evita el cierre automático",
                             activo = servicioPermanente,
                             onInfo = { mostrarInfoPermanente = true },
                             onToggle = {
@@ -177,7 +187,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // MODO: MODO ANTI-SUSPENSIÓN
+                        // Ajuste: Modo Anti-Suspensión
                         FilaAjusteConInfo(
                             titulo = "Modo Anti-Suspensión",
                             subtitulo = "Escucha con pantalla apagada",
@@ -195,14 +205,14 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         }
     }
 
-    // DIÁLOGOS DE INFORMACIÓN ESTRUCTURADOS
+    // GESTIÓN DE POPUPS DE INFORMACIÓN
     if (mostrarInfoPermanente) {
         StructuredInfoDialog(
             titulo = "Servicio Permanente",
             secciones = listOf(
                 "Función" to "Mantiene a Centinela en la memoria del móvil para que esté siempre lista para actuar.",
                 "Uso Diario" to "Déjalo activado siempre. No interfiere con otras apps y garantiza que los botones respondan.",
-                "Batería" to "Consumo casi inexistente (0%)."
+                "Batería" to "Consumo insignificante (0%)."
             ),
             onDismiss = { mostrarInfoPermanente = false }
         )
@@ -214,7 +224,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             secciones = listOf(
                 "Función" to "Activa un motor de audio silencioso para que el sistema no 'duerma' los botones de volumen.",
                 "Caso de Uso" to "Actívalo solo cuando necesites grabar discretamente con el móvil bloqueado y en el bolsillo.",
-                "Batería" to "Consumo moderado (similar a escuchar música). Desactívalo al terminar para ahorrar energía."
+                "Batería" to "Consumo moderado (similar a escuchar música). Desactívalo al terminar la jornada."
             ),
             onDismiss = { mostrarInfoAntiSuspension = false }
         )
@@ -266,40 +276,4 @@ fun FilaAjusteConInfo(
             )
         )
     }
-}
-
-@Composable
-fun StructuredInfoDialog(titulo: String, secciones: List<Pair<String, String>>, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = titulo, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                secciones.forEach { (subtitulo, contenido) ->
-                    Column {
-                        Text(
-                            text = subtitulo.uppercase(),
-                            color = Color(0xFF3D5AFE),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = contenido,
-                            color = Color.LightGray,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("ENTENDIDO", color = Color(0xFF3D5AFE), fontWeight = FontWeight.Bold)
-            }
-        },
-        containerColor = Color(0xFF1A1D2E),
-        shape = RoundedCornerShape(24.dp)
-    )
 }

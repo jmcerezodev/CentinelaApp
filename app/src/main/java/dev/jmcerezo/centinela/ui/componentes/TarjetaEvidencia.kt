@@ -16,9 +16,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jmcerezo.centinela.model.GrabacionDato
+import dev.jmcerezo.centinela.data.local.db.GrabacionDato
 import java.io.File
 
+/**
+ * Componente que muestra la información de una grabación individual.
+ * Permite reproducir, renombrar, compartir y eliminar la evidencia.
+ */
 @Composable
 fun TarjetaEvidencia(
     grabacion: GrabacionDato,
