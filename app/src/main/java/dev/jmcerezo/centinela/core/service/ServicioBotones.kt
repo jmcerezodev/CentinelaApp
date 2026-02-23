@@ -50,6 +50,7 @@ class ServicioBotones : AccessibilityService() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 "dev.jmcerezo.ACTUALIZAR_CONFIGURACION" -> actualizarEstadoServicio()
+                // REARME PREVENTIVO: Al apagar la pantalla, preparamos el botón
                 Intent.ACTION_SCREEN_OFF -> asegurarMargenVolumen()
                 "android.media.VOLUME_CHANGED_ACTION" -> {
                     val streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
@@ -58,6 +59,7 @@ class ServicioBotones : AccessibilityService() {
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
                         if (nuevoVol > antiguoVol) registrarPulsacion()
                         
+                        // Si el volumen llega al máximo con pantalla apagada, bajamos un punto para rearmar
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
                         }
@@ -69,6 +71,7 @@ class ServicioBotones : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        // Mantenemos tu forma original de acceso al motor
         motor = GrabadoraMotor(this)
         prefs = Preferencias(this)
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
@@ -96,16 +99,18 @@ class ServicioBotones : AccessibilityService() {
     }
 
     private fun asegurarMargenVolumen() {
-        val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        if (current >= max) {
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, max - 1, 0)
-        }
+        try {
+            val current = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            if (current >= max) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, max - 1, 0)
+            }
+        } catch (e: Exception) {}
     }
 
     fun actualizarEstadoServicio() {
-        if (prefs.servicioPermanente) {
-            mostrarNotificacionPermanente()
+        if (prefs.servicioPermanente || prefs.modoSilencioso) {
+            mostrarNotificacionActiva()
         } else {
             detenerWakeLock()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -149,22 +154,24 @@ class ServicioBotones : AccessibilityService() {
         audioManager.abandonAudioFocus(null)
     }
 
-    private fun mostrarNotificacionPermanente() {
+    private fun mostrarNotificacionActiva() {
         val channelId = "centinela_servicio"
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Protección Centinela"
-            val mChannel = NotificationChannel(channelId, name, NotificationManager.IMPORTANCE_LOW)
+            val name = "Sistema Centinela"
+            val mChannel = NotificationChannel(channelId, name, NotificationManager.IMPORTANCE_DEFAULT)
             notificationManager.createNotificationChannel(mChannel)
         }
 
+        val subtitulo = if (prefs.modoSilencioso) "Modo Anti-Suspensión activo" else "Servicio de seguridad activo"
+
         val notification: Notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Sistema Centinela")
-            .setContentText("Servicio de seguridad activo")
+            .setContentText(subtitulo)
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -195,7 +202,7 @@ class ServicioBotones : AccessibilityService() {
     private fun adquirirWakeLock() {
         if (wakeLock != null) return
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Centinela:CPU")
-        wakeLock?.acquire(2 * 60 * 60 * 1000L) 
+        wakeLock?.acquire(2 * 60 * 60 * 1000L)
     }
 
     private fun detenerWakeLock() {

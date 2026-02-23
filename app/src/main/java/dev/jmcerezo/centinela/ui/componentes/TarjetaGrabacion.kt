@@ -30,7 +30,7 @@ import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 /**
  * Componente principal de control de grabación.
  * Gestiona el inicio/parada de la grabadora y los ajustes de servicio en segundo plano.
- * 
+ *
  * @param gestorAudio Instancia del motor de grabación.
  * @param alVerArchivos Callback ejecutado al detener una grabación.
  */
