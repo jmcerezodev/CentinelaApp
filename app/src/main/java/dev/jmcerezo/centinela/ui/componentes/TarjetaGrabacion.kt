@@ -162,10 +162,10 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                             color = Color.Gray.copy(alpha = 0.1f)
                         )
 
-                        // OPCIÓN: SERVICIO PERMANENTE
-                        AjusteFila(
+                        // MODO: SERVICIO PERMANENTE
+                        FilaAjusteConInfo(
                             titulo = "Servicio Permanente",
-                            subtitulo = "Evita que el sistema cierre la app",
+                            subtitulo = "Evita el cierre de la app",
                             activo = servicioPermanente,
                             onInfo = { mostrarInfoPermanente = true },
                             onToggle = {
@@ -177,10 +177,10 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // OPCIÓN: MODO ANTI-SUSPENSIÓN
-                        AjusteFila(
+                        // MODO: MODO ANTI-SUSPENSIÓN
+                        FilaAjusteConInfo(
                             titulo = "Modo Anti-Suspensión",
-                            subtitulo = "Forzar escucha con pantalla apagada",
+                            subtitulo = "Escucha con pantalla apagada",
                             activo = modoSilencioso,
                             onInfo = { mostrarInfoAntiSuspension = true },
                             onToggle = {
@@ -195,9 +195,9 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         }
     }
 
-    // DIÁLOGOS DE INFORMACIÓN REESTRUCTURADOS
+    // DIÁLOGOS DE INFORMACIÓN ESTRUCTURADOS
     if (mostrarInfoPermanente) {
-        InfoDialog(
+        StructuredInfoDialog(
             titulo = "Servicio Permanente",
             secciones = listOf(
                 "Función" to "Mantiene a Centinela en la memoria del móvil para que esté siempre lista para actuar.",
@@ -209,7 +209,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
     }
 
     if (mostrarInfoAntiSuspension) {
-        InfoDialog(
+        StructuredInfoDialog(
             titulo = "Modo Anti-Suspensión",
             secciones = listOf(
                 "Función" to "Activa un motor de audio silencioso para que el sistema no 'duerma' los botones de volumen.",
@@ -222,7 +222,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
 }
 
 @Composable
-fun AjusteFila(
+fun FilaAjusteConInfo(
     titulo: String,
     subtitulo: String,
     activo: Boolean,
@@ -269,7 +269,7 @@ fun AjusteFila(
 }
 
 @Composable
-fun InfoDialog(titulo: String, secciones: List<Pair<String, String>>, onDismiss: () -> Unit) {
+fun StructuredInfoDialog(titulo: String, secciones: List<Pair<String, String>>, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = titulo, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold) },
