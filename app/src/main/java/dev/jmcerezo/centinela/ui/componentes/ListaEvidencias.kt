@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes
+package dev.jmcerezo.centinela.ui.componentes
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jmcerezo.grabadoralegal.model.GrabacionDato
+import dev.jmcerezo.centinela.model.GrabacionDato
 
 @Composable
 fun ListaEvidencias(
@@ -24,7 +24,6 @@ fun ListaEvidencias(
     onDelete: (GrabacionDato) -> Unit,
     onToggleFavorite: (GrabacionDato) -> Unit
 ) {
-    // Ordenamos la lista: primero favoritos, luego por fecha (ID descendente)
     val listaOrdenada = remember(lista) {
         lista.sortedWith(
             compareByDescending<GrabacionDato> { it.esFavorito }

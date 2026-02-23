@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.core
+package dev.jmcerezo.centinela.core
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -12,8 +12,8 @@ import android.util.Log
 import androidx.core.content.FileProvider
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import dev.jmcerezo.grabadoralegal.model.AppDatabase
-import dev.jmcerezo.grabadoralegal.model.GrabacionDato
+import dev.jmcerezo.centinela.model.AppDatabase
+import dev.jmcerezo.centinela.model.GrabacionDato
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,11 +34,8 @@ class GrabadoraMotor(private val contexto: Context) {
     private val dao = db.grabacionDao()
     private val scope = CoroutineScope(Dispatchers.IO)
 
-    // --- NUEVO: Callback para avisar a la interfaz ---
     var onActualizarLista: (() -> Unit)? = null
-    // ------------------------------------------------
 
-    // GPS: Cliente de servicios de ubicación
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(contexto)
     private var ubicacionActual: String = "Ubicación no disponible"
 
@@ -59,7 +56,6 @@ class GrabadoraMotor(private val contexto: Context) {
 
         val storageDir = contexto.filesDir
 
-        // --- NUEVA LÓGICA DE NOMBRE CORRELATIVO ---
         val archivosExistentes = storageDir.listFiles { f ->
             f.name.startsWith("Evidencia ") && f.extension == "m4a"
         } ?: arrayOf()
@@ -71,14 +67,10 @@ class GrabadoraMotor(private val contexto: Context) {
         }.maxOrNull() ?: 0
 
         val nuevoNombre = "Evidencia %02d".format(ultimoNumero + 1)
-        // ------------------------------------------
 
         archivoAudio = File(storageDir, "$nuevoNombre.m4a")
-        
-        // Reseteamos la ubicación antes de empezar para no usar la de la grabación anterior
         ubicacionActual = "Ubicación no disponible"
 
-        // Captura de ubicación asíncrona
         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
             .addOnSuccessListener { location ->
                 if (location != null) {
@@ -98,7 +90,6 @@ class GrabadoraMotor(private val contexto: Context) {
                 }
             }
 
-        // 1. FORZAR ENCENDIDO DE PANTALLA
         try {
             val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
             liberarWakeLock()
@@ -115,7 +106,6 @@ class GrabadoraMotor(private val contexto: Context) {
             Log.e("Centinela", "Error al despertar: ${e.message}")
         }
 
-        // 2. VIBRACIÓN DE CONFIRMACIÓN
         vibrar(longArrayOf(0, 300))
 
         try {
@@ -146,7 +136,6 @@ class GrabadoraMotor(private val contexto: Context) {
         if (!estaGrabando) return ""
         estaGrabando = false
 
-        // Guardamos la ubicación capturada en una variable local para el closure del scope.launch
         val ubicacionParaGuardar = ubicacionActual
 
         val hash = try {
@@ -167,7 +156,6 @@ class GrabadoraMotor(private val contexto: Context) {
 
             val generado = archivoAudio?.let { generarHashSHA256(it) } ?: "Error"
             
-            // GUARDAR EN BASE DE DATOS
             archivoAudio?.let { file ->
                 val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(file.lastModified())
                 val nombreArchivo = file.nameWithoutExtension
@@ -191,11 +179,9 @@ class GrabadoraMotor(private val contexto: Context) {
             "Error"
         }
 
-        // --- NUEVO: Ejecutar el aviso para que la UI se entere ---
         Handler(Looper.getMainLooper()).post {
             onActualizarLista?.invoke()
         }
-        // --------------------------------------------------------
 
         return hash
     }

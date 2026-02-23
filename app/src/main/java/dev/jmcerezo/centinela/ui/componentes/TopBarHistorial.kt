@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes
+package dev.jmcerezo.centinela.ui.componentes
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text

@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes.dialogos
+package dev.jmcerezo.centinela.ui.componentes.dialogos
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -19,7 +19,7 @@ fun DialogoInfoTecnica(onDismiss: () -> Unit) {
             Column {
                 ItemTecnico("Encriptación", "SHA-256 (Hash de Integridad)")
                 ItemTecnico("Formato", "MPEG-4 (AAC)")
-                ItemTecnico("Localización", "GPS + Metadatos .loc")
+                ItemTecnico("Localización", "GPS en base de datos segura")
             }
         },
         confirmButton = {

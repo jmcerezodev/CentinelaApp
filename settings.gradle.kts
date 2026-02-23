@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GrabadoraLegal"
+rootProject.name = "Centinela"
 include(":app")

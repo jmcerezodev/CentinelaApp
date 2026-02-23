@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.core
+package dev.jmcerezo.centinela.core
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
@@ -19,7 +19,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import androidx.core.app.NotificationCompat
-import dev.jmcerezo.grabadoralegal.R
+import dev.jmcerezo.centinela.R
 
 class ServicioBotones : AccessibilityService() {
 
@@ -51,7 +51,6 @@ class ServicioBotones : AccessibilityService() {
                             registrarPulsacion("SISTEMA")
                         }
                         
-                        // Si llegamos al máximo con pantalla apagada, bajamos un punto para rearmar
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
                         }
@@ -252,20 +251,15 @@ class ServicioBotones : AccessibilityService() {
 
     private fun registrarPulsacion(origen: String) {
         val tiempoActual = System.currentTimeMillis()
-        
-        // Evitar doble conteo (evento físico + evento sistema) en menos de 100ms
         if (tiempoActual - ultimaPulsacionProcesada < 100) return
         ultimaPulsacionProcesada = tiempoActual
 
-        // Ventana de tiempo entre clics: máximo 1 segundo para ser considerado "seguido"
         if (tiempoActual - ultimaPulsacion < 1000) {
             contadorPulsaciones++
         } else {
             contadorPulsaciones = 1
         }
         ultimaPulsacion = tiempoActual
-
-        Log.d("Centinela", "Pulsación $contadorPulsaciones detectada via $origen")
 
         if (contadorPulsaciones == 3) {
             gestionarGrabacion()

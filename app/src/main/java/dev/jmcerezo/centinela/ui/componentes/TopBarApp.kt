@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes
+package dev.jmcerezo.centinela.ui.componentes
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -25,20 +25,19 @@ fun TopBarApp(onInfoClick: () -> Unit) {
             Text(
                 text = "CENTINELA",
                 color = Color.White,
-                fontSize = 20.sp, // Reducido de 24.sp
+                fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.5.sp
             )
             Text(
                 text = "SISTEMA DE PROTECCIÓN LEGAL",
                 color = Color(0xFF3D5AFE),
-                fontSize = 9.sp, // Reducido de 10.sp
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.5.sp
             )
         }
 
-        // El botón de info ahora vive aquí arriba
         IconButton(onClick = onInfoClick) {
             Icon(
                 imageVector = Icons.Default.Info,

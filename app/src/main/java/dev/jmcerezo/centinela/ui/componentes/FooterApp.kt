@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes
+package dev.jmcerezo.centinela.ui.componentes
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.sp
 fun FooterApp() {
     Text(
         text = "Desarrollado por JMCerezoDev",
-        color = Color.Gray.copy(alpha = 0.5f), // Color discreto
+        color = Color.Gray.copy(alpha = 0.5f),
         fontSize = 10.sp,
         modifier = Modifier
             .fillMaxWidth()

@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes
+package dev.jmcerezo.centinela.ui.componentes
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jmcerezo.grabadoralegal.model.GrabacionDato
+import dev.jmcerezo.centinela.model.GrabacionDato
 import java.io.File
 
 @Composable

@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.jmcerezo.grabadoralegal"
+    namespace = "dev.jmcerezo.centinela"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.jmcerezo.grabadoralegal"
+        applicationId = "dev.jmcerezo.centinela"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

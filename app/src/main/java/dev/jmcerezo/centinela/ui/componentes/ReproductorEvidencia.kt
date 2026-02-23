@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes
+package dev.jmcerezo.centinela.ui.componentes
 
 import android.media.MediaPlayer
 import androidx.compose.foundation.layout.*
@@ -22,7 +22,6 @@ fun ReproductorEvidencia(archivo: File) {
     var posicionActual by remember { mutableFloatStateOf(0f) }
     var duracionTotal by remember { mutableFloatStateOf(0f) }
 
-    // Estado para saber si el usuario está arrastrando el dedo
     var estaArrastrando by remember { mutableStateOf(false) }
 
     DisposableEffect(archivo) {
@@ -40,7 +39,6 @@ fun ReproductorEvidencia(archivo: File) {
         }
     }
 
-    // Actualización rápida para suavidad (100ms es el punto dulce)
     LaunchedEffect(estaReproduciendo, estaArrastrando) {
         while (estaReproduciendo && !estaArrastrando) {
             posicionActual = mediaPlayer?.currentPosition?.toFloat() ?: 0f
@@ -81,12 +79,12 @@ fun ReproductorEvidencia(archivo: File) {
             Slider(
                 value = posicionActual,
                 onValueChange = { nuevaPos ->
-                    estaArrastrando = true // Bloqueamos la actualización del hilo
+                    estaArrastrando = true
                     posicionActual = nuevaPos
                 },
                 onValueChangeFinished = {
                     mediaPlayer?.seekTo(posicionActual.toInt())
-                    estaArrastrando = false // Devolvemos el control al hilo
+                    estaArrastrando = false
                 },
                 valueRange = 0f..(if (duracionTotal > 0) duracionTotal else 1f),
                 modifier = Modifier.weight(1f),

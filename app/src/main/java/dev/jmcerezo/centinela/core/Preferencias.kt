@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.core
+package dev.jmcerezo.centinela.core
 
 import android.content.Context
 import android.content.SharedPreferences

@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes
+package dev.jmcerezo.centinela.ui.componentes
 
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -23,8 +23,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jmcerezo.grabadoralegal.core.GrabadoraMotor
-import dev.jmcerezo.grabadoralegal.core.Preferencias
+import dev.jmcerezo.centinela.core.GrabadoraMotor
+import dev.jmcerezo.centinela.core.Preferencias
 
 @Composable
 fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
@@ -257,7 +257,7 @@ fun AjusteFila(
         Switch(
             checked = activo,
             onCheckedChange = onToggle,
-            modifier = Modifier.scale(0.7f), // Interruptor más pequeño
+            modifier = Modifier.scale(0.7f),
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = Color(0xFF3D5AFE),

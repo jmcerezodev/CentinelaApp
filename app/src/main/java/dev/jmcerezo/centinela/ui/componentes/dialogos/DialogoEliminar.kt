@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes.dialogos
+package dev.jmcerezo.centinela.ui.componentes.dialogos
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable

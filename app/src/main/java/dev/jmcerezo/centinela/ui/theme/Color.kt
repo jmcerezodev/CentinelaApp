@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.theme
+package dev.jmcerezo.centinela.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

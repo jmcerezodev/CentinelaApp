@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.ui.componentes.dialogos
+package dev.jmcerezo.centinela.ui.componentes.dialogos
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -13,7 +13,6 @@ fun DialogoRenombrar(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    // Estado local para lo que el usuario escribe
     var textoNuevoNombre by remember { mutableStateOf(nombreActual) }
 
     AlertDialog(

@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.model
+package dev.jmcerezo.centinela.model
 
 import androidx.room.Dao
 import androidx.room.Delete

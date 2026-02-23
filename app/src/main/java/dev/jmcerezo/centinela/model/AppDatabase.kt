@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.model
+package dev.jmcerezo.centinela.model
 
 import android.content.Context
 import androidx.room.Database
@@ -20,7 +20,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "grabadora_database"
                 )
-                // Usamos la versión no deprecada para Room 2.7+
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
                 INSTANCE = instance

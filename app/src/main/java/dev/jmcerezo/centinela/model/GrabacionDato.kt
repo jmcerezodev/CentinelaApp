@@ -1,4 +1,4 @@
-package dev.jmcerezo.grabadoralegal.model
+package dev.jmcerezo.centinela.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

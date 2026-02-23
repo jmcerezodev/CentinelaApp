@@ -1,10 +1,10 @@
-package dev.jmcerezo.grabadoralegal.ui
+package dev.jmcerezo.centinela.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import dev.jmcerezo.grabadoralegal.model.AppDatabase
-import dev.jmcerezo.grabadoralegal.model.GrabacionDato
+import dev.jmcerezo.centinela.model.AppDatabase
+import dev.jmcerezo.centinela.model.GrabacionDato
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
