@@ -16,7 +16,7 @@ import java.util.Locale
 
 /**
  * MOTOR DE GRABACIÓN CENTINELA (Director de Orquesta)
- * 
+ *
  * Orquesta la lógica entre el hardware de audio, GPS y la base de datos.
  * Utiliza ayudantes especializados para cada tarea técnica.
  */
@@ -123,10 +123,10 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
             try {
                 val nombreLimpio = nuevoNombre.trim().replace(Regex("[^a-zA-Z0-9_\\- ]"), "_")
                 if (nombreLimpio.isEmpty()) return@launch
-                
+
                 val archivoOriginal = File(grabacion.rutaArchivo)
                 val nuevoArchivo = File(archivoOriginal.parent, "$nombreLimpio.m4a")
-                
+
                 if (archivoOriginal.exists() && archivoOriginal.renameTo(nuevoArchivo)) {
                     dao.update(grabacion.copy(
                         nombre = nombreLimpio,
