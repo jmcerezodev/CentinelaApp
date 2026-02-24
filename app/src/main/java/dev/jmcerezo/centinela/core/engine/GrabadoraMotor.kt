@@ -1,8 +1,17 @@
 package dev.jmcerezo.centinela.core.engine
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
+import android.content.Intent
+import android.location.Geocoder
+import android.media.AudioAttributes
+import android.media.MediaPlayer
+import android.media.MediaRecorder
+import android.os.*
+import android.util.Log
+import androidx.core.content.FileProvider
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import dev.jmcerezo.centinela.core.engine.helpers.*
 import dev.jmcerezo.centinela.data.local.db.AppDatabase
 import dev.jmcerezo.centinela.data.local.db.GrabacionDato
@@ -15,20 +24,16 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
- * MOTOR DE GRABACIÓN CENTINELA (Director de Orquesta)
- *
- * Orquesta la lógica entre el hardware de audio, GPS y la base de datos.
- * Utiliza ayudantes especializados para cada tarea técnica.
+ * MOTOR DE GRABACIÓN CENTINELA (Singleton)
+ * Único punto de control para el hardware y la lógica de pulsaciones.
  */
 class GrabadoraMotor private constructor(private val contexto: Context) {
 
-    // Especialistas modulares
     private val recorder = AudioRecorderManager(contexto)
     private val player = AudioPlayerManager()
     private val location = LocationManagerHelper(contexto)
     private val system = SystemInteractionHelper(contexto)
     
-    // Acceso a Datos
     private val db = AppDatabase.getDatabase(contexto)
     private val dao = db.grabacionDao()
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -36,6 +41,11 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     var onActualizarLista: (() -> Unit)? = null
     var estaGrabando: Boolean = false
         private set
+
+    // Lógica de pulsaciones unificada
+    private var contadorPulsaciones = 0
+    private var ultimaPulsacion: Long = 0
+    private var ultimaAccionExitosa: Long = 0
 
     companion object {
         @Volatile private var INSTANCE: GrabadoraMotor? = null
@@ -47,34 +57,53 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     }
 
     /**
-     * Inicia la orquestación de una nueva evidencia legal.
+     * Procesa una pulsación de volumen. 
+     * Solo el motor decide si se alcanza el umbral de 3 clics.
      */
+    fun registrarPulsacion() {
+        val ahora = System.currentTimeMillis()
+        
+        // Bloqueo de seguridad: Evita que ráfagas duplicadas de diferentes servicios
+        // disparen la grabación varias veces seguidas (Anti-Rebote)
+        if (ahora - ultimaAccionExitosa < 2000) return
+
+        if (ahora - ultimaPulsacion < 1000) {
+            contadorPulsaciones++
+        } else {
+            contadorPulsaciones = 1
+        }
+        ultimaPulsacion = ahora
+
+        if (contadorPulsaciones >= 3) {
+            contadorPulsaciones = 0
+            ultimaAccionExitosa = ahora
+            gestionarEstadoGrabacion()
+        }
+    }
+
+    private fun gestionarEstadoGrabacion() {
+        if (estaGrabando) detenerGrabacion() else iniciarGrabacion()
+    }
+
+    @SuppressLint("MissingPermission")
     fun iniciarGrabacion() {
         if (estaGrabando) return
-
-        // 1. Preparamos el archivo y la ubicación
         val nuevoArchivo = GeneradorArchivos.prepararArchivo(contexto)
         location.capturarUbicacionActual()
-
-        // 2. Alertamos al sistema y al usuario
         system.despertarDispositivo()
         system.vibrarConfirmacion()
 
-        // 3. Iniciamos el hardware de audio
         if (recorder.iniciar(nuevoArchivo)) {
             estaGrabando = true
+            notificarCambioGlobal()
         } else {
             system.vibrarError()
         }
     }
 
-    /**
-     * Detiene la orquestación y guarda el resultado legal.
-     */
     fun detenerGrabacion(): String {
         if (!estaGrabando) return ""
         estaGrabando = false
-
         val archivoAudio = recorder.detener()
         system.vibrarConfirmacion()
         system.liberarRecursos()
@@ -85,8 +114,13 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
             firma
         } else "Error"
 
-        notifyUI()
+        notificarCambioGlobal()
         return hash
+    }
+
+    private fun notificarCambioGlobal() {
+        Handler(Looper.getMainLooper()).post { onActualizarLista?.invoke() }
+        contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
     }
 
     private fun persistirEvidencia(file: File, hash: String, ubicacion: String) {
@@ -102,11 +136,6 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         }
     }
 
-    private fun notifyUI() {
-        Handler(Looper.getMainLooper()).post { onActualizarLista?.invoke() }
-    }
-
-    // Delegación de funciones a especialistas
     fun eliminarGrabacion(grabacion: GrabacionDato) {
         scope.launch {
             val file = File(grabacion.rutaArchivo)
@@ -134,7 +163,7 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
                     ))
                 }
             } catch (e: Exception) {
-                // Silenciamos el error o podríamos notificar a la UI si fuera necesario
+                Log.e("Centinela", "Error al renombrar: ${e.message}")
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.currentState
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
+import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
 import dev.jmcerezo.centinela.core.service.CentinelaService
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 import kotlinx.coroutines.MainScope
@@ -22,18 +23,19 @@ import kotlinx.coroutines.launch
 /**
  * LÓGICA DEL WIDGET CENTINELA
  * 
- * Gestiona el estado reactivo y la sincronización con la aplicación.
+ * Gestiona el estado reactivo y las acciones del usuario (toggles y grabación directa).
  * La interfaz visual se delega a CentinelaWidgetUI.kt.
  */
 class CentinelaWidget : GlanceAppWidget() {
 
     companion object {
+        val KEY_GRABANDO = booleanPreferencesKey("esta_grabando")
         val KEY_BOTONES = booleanPreferencesKey("botones_habilitados")
         val KEY_PERMANENTE = booleanPreferencesKey("servicio_permanente")
         val KEY_SILENCIOSO = booleanPreferencesKey("modo_silencioso")
-        
-        // Clave para identificar qué preferencia se cambia desde el widget
-        val PARAM_KEY = ActionParameters.Key<String>("pref")
+
+        // Clave para identificar qué acción se ejecuta desde el widget
+        val PARAM_ACCION = ActionParameters.Key<String>("accion")
     }
 
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
@@ -42,10 +44,11 @@ class CentinelaWidget : GlanceAppWidget() {
         provideContent {
             // Obtenemos el estado reactivo de Glance
             val state = currentState<androidx.datastore.preferences.core.Preferences>()
-            
+
             GlanceTheme {
                 // Llamamos a la interfaz visual pasándole los estados actuales
                 CentinelaWidgetContent(
+                    grabando = state[KEY_GRABANDO] ?: false,
                     botones = state[KEY_BOTONES] ?: true,
                     permanente = state[KEY_PERMANENTE] ?: false,
                     silencioso = state[KEY_SILENCIOSO] ?: false
@@ -56,61 +59,68 @@ class CentinelaWidget : GlanceAppWidget() {
 }
 
 /**
- * Procesa las pulsaciones en los iconos del widget.
+ * Gestor de acciones del Widget.
+ * Procesa los clics en los iconos y sincroniza tanto la base de datos como los servicios.
  */
 class ToggleAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val prefKey = parameters[CentinelaWidget.PARAM_KEY] ?: return
+        val accion = parameters[CentinelaWidget.PARAM_ACCION] ?: return
         val prefsApp = Preferencias(context)
+        val motor = GrabadoraMotor.getInstance(context)
 
-        // 1. Actualización Atómica del Estado del Widget (Fuerza el redibujado visual)
+        // Actualizamos el estado interno del widget para que el redibujado sea inmediato
         updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { currentPrefs ->
             val mutablePrefs = currentPrefs.toMutablePreferences()
-            when (prefKey) {
+            
+            when (accion) {
+                "grabar" -> {
+                    if (motor.estaGrabando) motor.detenerGrabacion() else motor.iniciarGrabacion()
+                    mutablePrefs[CentinelaWidget.KEY_GRABANDO] = motor.estaGrabando
+                }
                 "botones" -> {
-                    val newVal = !(currentPrefs[CentinelaWidget.KEY_BOTONES] ?: true)
-                    mutablePrefs[CentinelaWidget.KEY_BOTONES] = newVal
-                    prefsApp.botonesHabilitados = newVal
+                    val nuevoValor = !(currentPrefs[CentinelaWidget.KEY_BOTONES] ?: true)
+                    mutablePrefs[CentinelaWidget.KEY_BOTONES] = nuevoValor
+                    prefsApp.botonesHabilitados = nuevoValor
                 }
                 "permanente" -> {
-                    val newVal = !(currentPrefs[CentinelaWidget.KEY_PERMANENTE] ?: false)
-                    mutablePrefs[CentinelaWidget.KEY_PERMANENTE] = newVal
-                    prefsApp.servicioPermanente = newVal
+                    val nuevoValor = !(currentPrefs[CentinelaWidget.KEY_PERMANENTE] ?: false)
+                    mutablePrefs[CentinelaWidget.KEY_PERMANENTE] = nuevoValor
+                    prefsApp.servicioPermanente = nuevoValor
                 }
                 "suspension" -> {
-                    val newVal = !(currentPrefs[CentinelaWidget.KEY_SILENCIOSO] ?: false)
-                    mutablePrefs[CentinelaWidget.KEY_SILENCIOSO] = newVal
-                    prefsApp.modoSilencioso = newVal
+                    val nuevoValor = !(currentPrefs[CentinelaWidget.KEY_SILENCIOSO] ?: false)
+                    mutablePrefs[CentinelaWidget.KEY_SILENCIOSO] = nuevoValor
+                    prefsApp.modoSilencioso = nuevoValor
                 }
             }
             mutablePrefs
         }
 
-        // 2. Notificación a servicios
+        // Sincronizamos con la aplicación y servicios en segundo plano
         context.startService(Intent(context, CentinelaService::class.java))
         context.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(context.packageName))
 
-        // 3. Forzamos el refresco inmediato de la vista
+        // Forzamos el redibujado de la interfaz
         CentinelaWidget().update(context, glanceId)
     }
 }
 
-/**
- * Receptor encargado de actualizar el widget cuando la App cambia los valores.
- */
 class CentinelaWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = CentinelaWidget()
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == "dev.jmcerezo.ACTUALIZAR_CONFIGURACION") {
+            val motor = GrabadoraMotor.getInstance(context)
             val prefsApp = Preferencias(context)
+
             MainScope().launch {
                 val manager = androidx.glance.appwidget.GlanceAppWidgetManager(context)
-                val glanceIds = manager.getGlanceIds(CentinelaWidget::class.java)
-                glanceIds.forEach { id ->
+                val ids = manager.getGlanceIds(CentinelaWidget::class.java)
+                ids.forEach { id ->
                     updateAppWidgetState(context, PreferencesGlanceStateDefinition, id) { prefs ->
                         val mutable = prefs.toMutablePreferences()
+                        mutable[CentinelaWidget.KEY_GRABANDO] = motor.estaGrabando
                         mutable[CentinelaWidget.KEY_BOTONES] = prefsApp.botonesHabilitados
                         mutable[CentinelaWidget.KEY_PERMANENTE] = prefsApp.servicioPermanente
                         mutable[CentinelaWidget.KEY_SILENCIOSO] = prefsApp.modoSilencioso
