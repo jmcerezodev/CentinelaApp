@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -24,38 +23,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
+import dev.jmcerezo.centinela.core.service.CentinelaService
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 
 /**
  * Componente principal de control de grabación.
  * Gestiona el inicio/parada de la grabadora y los ajustes de servicio en segundo plano.
- *
- * @param gestorAudio Instancia del motor de grabación.
- * @param alVerArchivos Callback ejecutado al detener una grabación.
  */
 @Composable
 fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
     val contexto = LocalContext.current
     val prefs = remember { Preferencias(contexto) }
     
-    // Estados locales sincronizados con el hardware y preferencias
     var grabando by remember { mutableStateOf(gestorAudio.estaGrabando) }
     var servicioPermanente by remember { mutableStateOf(prefs.servicioPermanente) }
     var modoSilencioso by remember { mutableStateOf(prefs.modoSilencioso) }
+    var botonesHabilitados by remember { mutableStateOf(prefs.botonesHabilitados) }
 
-    // Estados para la gestión de la UI desplegable
     var mostrarAjustes by remember { mutableStateOf(false) }
     var mostrarInfoPermanente by remember { mutableStateOf(false) }
     var mostrarInfoAntiSuspension by remember { mutableStateOf(false) }
+    var mostrarInfoBotones by remember { mutableStateOf(false) }
 
     val rotacionIcono by animateFloatAsState(if (mostrarAjustes) 180f else 0f, label = "rotacion_flecha")
 
-    /**
-     * Envía una señal al Servicio de Accesibilidad para que actualice su configuración
-     * basándose en las nuevas preferencias guardadas.
-     */
-    val actualizarServicio = {
+    val sincronizarServicio = {
+        val intent = Intent(contexto, CentinelaService::class.java)
+        contexto.startService(intent)
         contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").apply {
             setPackage(contexto.packageName)
         })
@@ -74,7 +69,6 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             shape = RoundedCornerShape(24.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                // FILA SUPERIOR: Estado del sistema y botón de acción principal
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -88,24 +82,12 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                             fontWeight = FontWeight.Bold
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(
-                                        if (grabando) Color(0xFFFF5252) else Color(0xFF00C853),
-                                        CircleShape
-                                    )
-                            )
+                            Box(modifier = Modifier.size(8.dp).background(if (grabando) Color(0xFFFF5252) else Color(0xFF00C853), CircleShape))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (grabando) "Micrófono activo" else "Escucha activa lista",
-                                color = Color.Gray,
-                                fontSize = 12.sp
-                            )
+                            Text(text = if (grabando) "Micrófono activo" else "Escucha activa lista", color = Color.Gray, fontSize = 12.sp)
                         }
                     }
 
-                    // Botón circular REC / STOP
                     IconButton(
                         onClick = {
                             if (grabando) {
@@ -117,29 +99,16 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                                 grabando = true
                             }
                         },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .background(
-                                if (grabando) Color(0xFFFF5252) else Color(0xFF3D5AFE),
-                                CircleShape
-                            )
+                        modifier = Modifier.size(56.dp).background(if (grabando) Color(0xFFFF5252) else Color(0xFF3D5AFE), CircleShape)
                     ) {
-                        Text(
-                            text = if (grabando) "STOP" else "REC",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = if (grabando) "STOP" else "REC", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // SECCIÓN DESPLEGABLE: Configuración Avanzada
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { mostrarAjustes = !mostrarAjustes },
+                    modifier = Modifier.fillMaxWidth().clickable { mostrarAjustes = !mostrarAjustes },
                     color = Color.Transparent
                 ) {
                     Row(
@@ -149,54 +118,52 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                     ) {
                         Icon(Icons.Default.Settings, null, tint = Color.Gray, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "CONFIGURACIÓN AVANZADA",
-                            color = Color.Gray,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.sp
-                        )
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            null,
-                            tint = Color.Gray,
-                            modifier = Modifier.rotate(rotacionIcono)
-                        )
+                        Text("CONFIGURACIÓN AVANZADA", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                        Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.Gray, modifier = Modifier.rotate(rotacionIcono))
                     }
                 }
 
                 AnimatedVisibility(visible = mostrarAjustes) {
                     Column {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 12.dp),
-                            color = Color.Gray.copy(alpha = 0.1f)
-                        )
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.Gray.copy(alpha = 0.1f))
 
-                        // Ajuste: Servicio Permanente
-                        FilaAjusteConInfo(
-                            titulo = "Servicio Permanente",
-                            subtitulo = "Evita el cierre automático",
-                            activo = servicioPermanente,
-                            onInfo = { mostrarInfoPermanente = true },
-                            onToggle = {
-                                servicioPermanente = it
-                                prefs.servicioPermanente = it
-                                actualizarServicio()
+                        AjusteInterruptorConInfo(
+                            titulo = "Grabación con Botones",
+                            subtitulo = "Usa volumen arriba (x3) para grabar",
+                            activo = botonesHabilitados,
+                            onInfo = { mostrarInfoBotones = true },
+                            onToggle = { activado ->
+                                botonesHabilitados = activado
+                                prefs.botonesHabilitados = activado
+                                sincronizarServicio()
                             }
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Ajuste: Modo Anti-Suspensión
-                        FilaAjusteConInfo(
+                        AjusteInterruptorConInfo(
+                            titulo = "Servicio Permanente",
+                            subtitulo = "Evita el cierre automático",
+                            activo = servicioPermanente,
+                            onInfo = { mostrarInfoPermanente = true },
+                            onToggle = { activado ->
+                                servicioPermanente = activado
+                                prefs.servicioPermanente = activado
+                                sincronizarServicio()
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        AjusteInterruptorConInfo(
                             titulo = "Modo Anti-Suspensión",
                             subtitulo = "Escucha con pantalla apagada",
                             activo = modoSilencioso,
                             onInfo = { mostrarInfoAntiSuspension = true },
-                            onToggle = {
-                                modoSilencioso = it
-                                prefs.modoSilencioso = it
-                                actualizarServicio()
+                            onToggle = { activado ->
+                                modoSilencioso = activado
+                                prefs.modoSilencioso = activado
+                                sincronizarServicio()
                             }
                         )
                     }
@@ -205,7 +172,18 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         }
     }
 
-    // GESTIÓN DE POPUPS DE INFORMACIÓN
+    if (mostrarInfoBotones) {
+        StructuredInfoDialog(
+            titulo = "Grabación con Botones",
+            secciones = listOf(
+                "Función" to "Permite iniciar o detener la grabación pulsando 3 veces el botón de volumen arriba.",
+                "Recomendación" to "Desactívalo si vas a escuchar música o manipular mucho el volumen para evitar grabaciones accidentales.",
+                "Seguridad" to "Aunque esté desactivado, siempre podrás grabar usando el botón REC de la pantalla principal."
+            ),
+            onDismiss = { mostrarInfoBotones = false }
+        )
+    }
+
     if (mostrarInfoPermanente) {
         StructuredInfoDialog(
             titulo = "Servicio Permanente",
@@ -227,53 +205,6 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                 "Batería" to "Consumo moderado (similar a escuchar música). Desactívalo al terminar la jornada."
             ),
             onDismiss = { mostrarInfoAntiSuspension = false }
-        )
-    }
-}
-
-@Composable
-fun FilaAjusteConInfo(
-    titulo: String,
-    subtitulo: String,
-    activo: Boolean,
-    onInfo: () -> Unit,
-    onToggle: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(titulo, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                Text(subtitulo, color = Color.Gray, fontSize = 11.sp)
-            }
-            IconButton(
-                onClick = onInfo,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = Color(0xFF3D5AFE).copy(alpha = 0.6f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-        Switch(
-            checked = activo,
-            onCheckedChange = onToggle,
-            modifier = Modifier.scale(0.7f),
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFF3D5AFE),
-                uncheckedThumbColor = Color.Gray,
-                uncheckedTrackColor = Color(0xFF25293D)
-            )
         )
     }
 }

@@ -23,4 +23,11 @@ class Preferencias(context: Context) {
     var modoSilencioso: Boolean
         get() = prefs.getBoolean("modo_silencioso", false)
         set(value) = prefs.edit().putBoolean("modo_silencioso", value).apply()
+
+    /**
+     * Determina si la grabación mediante los botones de volumen está habilitada.
+     */
+    var botonesHabilitados: Boolean
+        get() = prefs.getBoolean("botones_habilitados", true)
+        set(value) = prefs.edit().putBoolean("botones_habilitados", value).apply()
 }

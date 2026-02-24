@@ -53,6 +53,9 @@ class ServicioBotones : AccessibilityService() {
                 // REARME PREVENTIVO: Al apagar la pantalla, preparamos el botón
                 Intent.ACTION_SCREEN_OFF -> asegurarMargenVolumen()
                 "android.media.VOLUME_CHANGED_ACTION" -> {
+                    // Solo procesamos si los botones están habilitados en ajustes
+                    if (!prefs.botonesHabilitados) return
+
                     val streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
                     if (streamType == AudioManager.STREAM_MUSIC) {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
@@ -250,6 +253,9 @@ class ServicioBotones : AccessibilityService() {
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        // Solo procesamos si los botones están habilitados en ajustes
+        if (!prefs.botonesHabilitados) return false
+
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 registrarPulsacion()
