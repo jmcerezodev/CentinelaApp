@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             CentinelaTheme {
                 val contexto = LocalContext.current
-                val motor = remember { GrabadoraMotor(contexto) }
+                val motor = remember { GrabadoraMotor.getInstance(contexto) }
                 val viewModel: GrabacionViewModel = viewModel()
 
                 // Observamos la lista de grabaciones desde Room

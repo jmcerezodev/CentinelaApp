@@ -71,8 +71,8 @@ class ServicioBotones : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        // Mantenemos tu forma original de acceso al motor
-        motor = GrabadoraMotor(this)
+        // Corregido: Usamos getInstance() ya que el constructor es privado (Singleton)
+        motor = GrabadoraMotor.getInstance(this)
         prefs = Preferencias(this)
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         powerManager = getSystemService(POWER_SERVICE) as PowerManager
