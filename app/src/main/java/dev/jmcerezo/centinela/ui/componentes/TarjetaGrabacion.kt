@@ -1,6 +1,9 @@
 package dev.jmcerezo.centinela.ui.componentes
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -16,20 +19,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
 import dev.jmcerezo.centinela.core.service.CentinelaService
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 
 /**
- * Componente principal de control de grabación.
- * Gestiona el inicio/parada de la grabadora y los ajustes de servicio en segundo plano.
+ * Componente principal de control de grabación con sincronización en tiempo real.
  */
 @Composable
 fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
@@ -46,14 +48,26 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
     var mostrarInfoAntiSuspension by remember { mutableStateOf(false) }
     var mostrarInfoBotones by remember { mutableStateOf(false) }
 
-    val rotacionIcono by animateFloatAsState(if (mostrarAjustes) 180f else 0f, label = "rotacion_flecha")
+    // RECEPTOR PARA SINCRONIZAR CON EL WIDGET
+    DisposableEffect(contexto) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                // Cuando el widget cambia algo, actualizamos los estados de la UI de la app
+                servicioPermanente = prefs.servicioPermanente
+                modoSilencioso = prefs.modoSilencioso
+                botonesHabilitados = prefs.botonesHabilitados
+            }
+        }
+        val filter = IntentFilter("dev.jmcerezo.ACTUALIZAR_CONFIGURACION")
+        ContextCompat.registerReceiver(contexto, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { contexto.unregisterReceiver(receiver) }
+    }
 
-    val sincronizarServicio = {
-        val intent = Intent(contexto, CentinelaService::class.java)
-        contexto.startService(intent)
-        contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").apply {
-            setPackage(contexto.packageName)
-        })
+    val rotacionIcono by animateFloatAsState(if (mostrarAjustes) 180f else 0f, label = "rotacion")
+
+    val sincronizarServicios = {
+        contexto.startService(Intent(contexto, CentinelaService::class.java))
+        contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
     }
 
     Column(
@@ -69,18 +83,14 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
             shape = RoundedCornerShape(24.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
+                // FILA SUPERIOR: REC / STOP
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text(
-                            text = if (grabando) "GRABANDO AUDIO" else "SISTEMA EN ESPERA",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(text = if (grabando) "GRABANDO AUDIO" else "SISTEMA EN ESPERA", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(8.dp).background(if (grabando) Color(0xFFFF5252) else Color(0xFF00C853), CircleShape))
                             Spacer(modifier = Modifier.width(8.dp))
@@ -135,7 +145,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                             onToggle = { activado ->
                                 botonesHabilitados = activado
                                 prefs.botonesHabilitados = activado
-                                sincronizarServicio()
+                                sincronizarServicios()
                             }
                         )
 
@@ -149,7 +159,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                             onToggle = { activado ->
                                 servicioPermanente = activado
                                 prefs.servicioPermanente = activado
-                                sincronizarServicio()
+                                sincronizarServicios()
                             }
                         )
 
@@ -163,7 +173,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                             onToggle = { activado ->
                                 modoSilencioso = activado
                                 prefs.modoSilencioso = activado
-                                sincronizarServicio()
+                                sincronizarServicios()
                             }
                         )
                     }
@@ -172,13 +182,14 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         }
     }
 
+    // DIÁLOGOS DE INFORMACIÓN
     if (mostrarInfoBotones) {
         StructuredInfoDialog(
             titulo = "Grabación con Botones",
             secciones = listOf(
                 "Función" to "Permite iniciar o detener la grabación pulsando 3 veces el botón de volumen arriba.",
-                "Recomendación" to "Desactívalo si vas a escuchar música o manipular mucho el volumen para evitar grabaciones accidentales.",
-                "Seguridad" to "Aunque esté desactivado, siempre podrás grabar usando el botón REC de la pantalla principal."
+                "Recomendación" to "Desactívalo si vas a escuchar música.",
+                "Seguridad" to "Aunque esté desactivado, el botón REC de la pantalla siempre funcionará."
             ),
             onDismiss = { mostrarInfoBotones = false }
         )
@@ -188,8 +199,7 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         StructuredInfoDialog(
             titulo = "Servicio Permanente",
             secciones = listOf(
-                "Función" to "Mantiene a Centinela en la memoria del móvil para que esté siempre lista para actuar.",
-                "Uso Diario" to "Déjalo activado siempre. No interfiere con otras apps y garantiza que los botones respondan.",
+                "Función" to "Mantiene la app en memoria para actuar siempre.",
                 "Batería" to "Consumo insignificante (0%)."
             ),
             onDismiss = { mostrarInfoPermanente = false }
@@ -200,9 +210,9 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
         StructuredInfoDialog(
             titulo = "Modo Anti-Suspensión",
             secciones = listOf(
-                "Función" to "Activa un motor de audio silencioso para que el sistema no 'duerma' los botones de volumen.",
-                "Caso de Uso" to "Actívalo solo cuando necesites grabar discretamente con el móvil bloqueado y en el bolsillo.",
-                "Batería" to "Consumo moderado (similar a escuchar música). Desactívalo al terminar la jornada."
+                "Función" to "Fuerza la escucha con pantalla apagada.",
+                "Caso de Uso" to "Actívalo solo para grabaciones discretas.",
+                "Batería" to "Consumo moderado. Desactívalo al terminar."
             ),
             onDismiss = { mostrarInfoAntiSuspension = false }
         )
