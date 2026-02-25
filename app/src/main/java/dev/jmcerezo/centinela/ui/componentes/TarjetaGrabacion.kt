@@ -90,11 +90,11 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text(text = if (grabando) "GRABANDO AUDIO" else "SISTEMA EN ESPERA", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(text = if (grabando) "GRABANDO AUDIO" else "GRABADORA", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(8.dp).background(if (grabando) Color(0xFFFF5252) else Color(0xFF00C853), CircleShape))
+                            Box(modifier = Modifier.size(8.dp).background(if (grabando) Color(0xFF00C853) else Color(0xFFFF5252), CircleShape))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = if (grabando) "Micrófono activo" else "Escucha activa lista", color = Color.Gray, fontSize = 12.sp)
+                            Text(text = if (grabando) "Micrófono activo" else "Micrófono inactivo", color = Color.Gray, fontSize = 12.sp)
                         }
                     }
 
