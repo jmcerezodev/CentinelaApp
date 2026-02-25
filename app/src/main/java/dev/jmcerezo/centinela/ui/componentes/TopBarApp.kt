@@ -1,8 +1,6 @@
 package dev.jmcerezo.centinela.ui.componentes
 
 import android.Manifest
-import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -12,21 +10,43 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +59,7 @@ import dev.jmcerezo.centinela.core.service.CentinelaService
 import dev.jmcerezo.centinela.core.service.ServicioBotones
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
+import dev.jmcerezo.centinela.util.SystemUtils
 
 @Composable
 fun TopBarApp(onInfoClick: () -> Unit) {
@@ -94,7 +115,7 @@ fun TopBarApp(onInfoClick: () -> Unit) {
     }
 
     val actualizarEstados = {
-        accesibilidad = isAccessibilityServiceEnabledLocal(contexto, ServicioBotones::class.java)
+        accesibilidad = SystemUtils.isAccessibilityServiceEnabled(contexto, ServicioBotones::class.java)
         superposicion = Settings.canDrawOverlays(contexto)
         val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
         bateria = pm.isIgnoringBatteryOptimizations(contexto.packageName)
@@ -228,7 +249,7 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                             "Es la base del sistema. Permite capturar el audio de las evidencias con alta fidelidad.",
                             "Poder registrar lo que sucede a tu alrededor cuando activas la grabación.",
                             listOf("Se abrirá la configuración de la aplicación.", "Entra en el apartado 'Permisos'.", "Asegúrate de que 'Micrófono' esté en 'Permitir'."),
-                            { abrirAjustesAppLocal(contexto) }
+                            { SystemUtils.abrirAjustesApp(contexto) }
                         )
                     }
 
@@ -238,7 +259,7 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                             "Añade validez legal a tus grabaciones al certificar exactamente dónde se han realizado.",
                             "Vincular cada audio con coordenadas GPS precisas y dirección física.",
                             listOf("Entra en el apartado 'Permisos'.", "Selecciona 'Ubicación'.", "Elige 'Permitir solo si la aplicación está en uso'."),
-                            { abrirAjustesAppLocal(contexto) }
+                            { SystemUtils.abrirAjustesApp(contexto) }
                         )
                     }
 
@@ -249,7 +270,7 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                                 "Permite que el servicio de seguridad sea visible y no sea cerrado por Android.",
                                 "Mantener el sistema de escucha activo permanentemente en la barra de estado.",
                                 listOf("Entra en el apartado 'Notificaciones'.", "Activa el interruptor de 'Todas las notificaciones de Centinela'."),
-                                { abrirAjustesAppLocal(contexto) }
+                                { SystemUtils.abrirAjustesApp(contexto) }
                             )
                         }
                     }
@@ -377,13 +398,6 @@ fun TopBarApp(onInfoClick: () -> Unit) {
     }
 }
 
-private fun abrirAjustesAppLocal(context: Context) {
-    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-        data = Uri.parse("package:${context.packageName}")
-    }
-    context.startActivity(intent)
-}
-
 @Composable
 fun PermisoRenglonAppBar(nombre: String, activado: Boolean, onClick: () -> Unit) {
     Row(
@@ -401,9 +415,3 @@ fun PermisoRenglonAppBar(nombre: String, activado: Boolean, onClick: () -> Unit)
 }
 
 data class PermisoDetalle(val titulo: String, val funcion: String, val porQue: String, val pasos: List<String>, val accion: () -> Unit)
-
-fun isAccessibilityServiceEnabledLocal(context: Context, service: Class<out AccessibilityService>): Boolean {
-    val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-    val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-    return enabledServices.any { it.resolveInfo.serviceInfo.packageName == context.packageName && it.resolveInfo.serviceInfo.name == service.name }
-}

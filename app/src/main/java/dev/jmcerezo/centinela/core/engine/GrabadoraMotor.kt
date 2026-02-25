@@ -48,19 +48,10 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         }
     }
 
-    /**
-     * Procesa una pulsación de volumen con filtros de seguridad.
-     */
     fun registrarPulsacion() {
         val ahora = System.currentTimeMillis()
-
-        // 1. FILTRO ANTI-DUPLICADOS (Multi-source): 
-        // Ignora si recibimos eventos de diferentes servicios para el mismo clic (ventana de 150ms)
         if (ahora - ultimaPulsacionRecibida < 150) return
         ultimaPulsacionRecibida = ahora
-
-        // 2. BLOQUEO POST-ACCION: 
-        // Evita que ráfagas accidentales tras iniciar/parar cambien el estado (ventana de 2 seg)
         if (ahora - ultimaAccionExitosa < 2000) return
 
         if (ahora - ultimaPulsacion < 1000) {
@@ -85,7 +76,6 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     fun iniciarGrabacion() {
         if (estaGrabando) return
         val nuevoArchivo = GeneradorArchivos.prepararArchivo(contexto)
-        location.capturarUbicacionActual()
         system.despertarDispositivo()
         system.vibrarConfirmacion()
 
@@ -104,14 +94,18 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         system.vibrarConfirmacion()
         system.liberarRecursos()
 
-        val hash = if (archivoAudio != null) {
-            val firma = IntegrityUtils.generarHashSHA256(archivoAudio)
-            persistirEvidencia(archivoAudio, firma, location.obtenerUbicacionCapturada())
-            firma
-        } else "Error"
-
-        notificarCambioGlobal()
-        return hash
+        if (archivoAudio != null) {
+            location.capturarUbicacionActual { ubicacion ->
+                val firma = IntegrityUtils.generarHashSHA256(archivoAudio)
+                persistirEvidencia(archivoAudio, firma, ubicacion)
+            }
+            notificarCambioGlobal()
+            // Devuelve un hash provisional, el real se guarda en la DB
+            return IntegrityUtils.generarHashSHA256(archivoAudio) 
+        } else {
+            notificarCambioGlobal()
+            return "Error"
+        }
     }
 
     private fun notificarCambioGlobal() {

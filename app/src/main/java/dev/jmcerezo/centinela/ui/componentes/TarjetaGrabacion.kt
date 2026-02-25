@@ -1,5 +1,9 @@
 package dev.jmcerezo.centinela.ui.componentes
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -9,18 +13,38 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
 
 /**
- * Componente principal de control de grabación (Versión Minimalista).
- * Centrado exclusivamente en la acción de capturar evidencia.
+ * Componente principal de control de grabación.
+ * Sincronizado globalmente mediante broadcasts para responder a pulsaciones físicas.
  */
 @Composable
 fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
+    val contexto = LocalContext.current
     var grabando by remember { mutableStateOf(gestorAudio.estaGrabando) }
+
+    // Sincronización automática con el motor (Pulsaciones físicas, Widget, etc.)
+    DisposableEffect(contexto) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                grabando = gestorAudio.estaGrabando
+            }
+        }
+        val filter = IntentFilter("dev.jmcerezo.ACTUALIZAR_CONFIGURACION")
+        ContextCompat.registerReceiver(contexto, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        
+        onDispose {
+            try {
+                contexto.unregisterReceiver(receiver)
+            } catch (e: Exception) {}
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -66,11 +90,10 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                         onClick = {
                             if (grabando) {
                                 gestorAudio.detenerGrabacion()
-                                grabando = false
-                                alVerArchivos()
+                                // No cambiamos 'grabando' aquí manualmente, 
+                                // el broadcast lo hará por nosotros para asegurar sincronía total.
                             } else {
                                 gestorAudio.iniciarGrabacion()
-                                grabando = true
                             }
                         },
                         modifier = Modifier
