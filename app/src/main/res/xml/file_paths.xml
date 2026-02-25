@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
+    <!-- Ruta para audios internos -->
     <files-path name="mis_audios" path="." />
+    <!-- Ruta para informes PDF en almacenamiento externo de la app -->
+    <external-files-path name="mis_informes" path="." />
 </paths>

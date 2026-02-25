@@ -26,7 +26,8 @@ fun ListaEvidencias(
     onRename: (GrabacionDato) -> Unit,
     onShare: (GrabacionDato) -> Unit,
     onDelete: (GrabacionDato) -> Unit,
-    onToggleFavorite: (GrabacionDato) -> Unit
+    onToggleFavorite: (GrabacionDato) -> Unit,
+    onGeneratePDF: (GrabacionDato) -> Unit
 ) {
     // La lista se reordena automáticamente cuando cambian los datos o el estado de favoritos
     val listaOrdenada = remember(lista) {
@@ -69,7 +70,8 @@ fun ListaEvidencias(
                         onPlay = { onPlay(grabacion) },
                         onRename = { onRename(grabacion) },
                         onShare = { onShare(grabacion) },
-                        onDelete = { onDelete(grabacion) }
+                        onDelete = { onDelete(grabacion) },
+                        onGeneratePDF = { onGeneratePDF(grabacion) }
                     )
                 }
             }

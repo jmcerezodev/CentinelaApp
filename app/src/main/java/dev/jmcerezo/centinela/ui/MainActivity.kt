@@ -22,6 +22,7 @@ import dev.jmcerezo.centinela.data.local.db.GrabacionDato
 import dev.jmcerezo.centinela.ui.componentes.*
 import dev.jmcerezo.centinela.ui.componentes.dialogos.*
 import dev.jmcerezo.centinela.ui.theme.CentinelaTheme
+import dev.jmcerezo.centinela.util.PdfReportGenerator
 
 /**
  * Actividad principal de la aplicación Centinela.
@@ -108,6 +109,11 @@ class MainActivity : ComponentActivity() {
                             onDelete = { grabacion -> archivoParaEliminar = grabacion },
                             onToggleFavorite = { grabacion ->
                                 viewModel.actualizar(grabacion.copy(esFavorito = !grabacion.esFavorito))
+                            },
+                            onGeneratePDF = { grabacion ->
+                                // Lógica real de generación de PDF
+                                Toast.makeText(contexto, "Generando informe legal...", Toast.LENGTH_SHORT).show()
+                                PdfReportGenerator.generarYCompartir(contexto, grabacion)
                             }
                         )
                     }

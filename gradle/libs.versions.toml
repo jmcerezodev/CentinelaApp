@@ -11,6 +11,7 @@ composeBom = "2024.10.01"
 room = "2.7.0-alpha11"
 ksp = "2.0.21-1.0.28"
 glance = "1.1.1"
+itext = "7.2.5"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -33,6 +34,7 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
+itext7-core = { group = "com.itextpdf", name = "itext7-core", version.ref = "itext" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -37,7 +37,6 @@ android {
 }
 
 dependencies {
-    // Usamos puntos en lugar de guiones para acceder al catálogo de librerías (libs.versions.toml)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -56,6 +55,9 @@ dependencies {
     // Glance (Widgets)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+
+    // PDF Generation
+    implementation(libs.itext7.core)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

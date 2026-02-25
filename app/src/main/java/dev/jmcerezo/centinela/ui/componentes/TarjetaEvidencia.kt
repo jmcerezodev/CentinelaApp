@@ -31,7 +31,8 @@ fun TarjetaEvidencia(
     onPlay: () -> Unit,
     onRename: () -> Unit,
     onShare: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onGeneratePDF: () -> Unit
 ) {
     var menuExpandido by remember { mutableStateOf(false) }
     var reproductorVisible by remember { mutableStateOf(false) }
@@ -131,7 +132,7 @@ fun TarjetaEvidencia(
                                 onClick = { menuExpandido = false; onRename() }
                             )
                             DropdownMenuItem(
-                                text = { Text("Compartir", color = Color.White) },
+                                text = { Text("Compartir Audio", color = Color.White) },
                                 leadingIcon = { Icon(Icons.Default.Share, null, tint = Color.White) },
                                 onClick = { menuExpandido = false; onShare() }
                             )
@@ -171,6 +172,33 @@ fun TarjetaEvidencia(
                     DatoFila(etiqueta = "HASH SHA-256", valor = grabacion.hash.uppercase())
                     Spacer(modifier = Modifier.height(8.dp))
                     DatoFila(etiqueta = "LOCALIZACIÓN", valor = grabacion.ubicacion, esUbicacion = true)
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // BOTÓN GENERAR INFORME PDF
+                    Button(
+                        onClick = onGeneratePDF,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF3D5AFE).copy(alpha = 0.1f),
+                            contentColor = Color(0xFF3D5AFE)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "GENERAR INFORME PDF",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.sp
+                        )
+                    }
                 }
             }
         }
