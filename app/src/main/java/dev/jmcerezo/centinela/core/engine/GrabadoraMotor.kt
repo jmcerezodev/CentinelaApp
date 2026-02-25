@@ -48,6 +48,20 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         }
     }
 
+    /**
+     * SOLO PARA PRUEBAS: Limpia el estado interno para garantizar independencia entre tests.
+     */
+    fun resetEstadoInterno() {
+        contadorPulsaciones = 0
+        ultimaPulsacion = 0
+        ultimaAccionExitosa = 0
+        ultimaPulsacionRecibida = 0
+        if (estaGrabando) {
+            estaGrabando = false
+            recorder.detener()
+        }
+    }
+
     fun registrarPulsacion() {
         val ahora = System.currentTimeMillis()
         if (ahora - ultimaPulsacionRecibida < 150) return
@@ -100,7 +114,6 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
                 persistirEvidencia(archivoAudio, firma, ubicacion)
             }
             notificarCambioGlobal()
-            // Devuelve un hash provisional, el real se guarda en la DB
             return IntegrityUtils.generarHashSHA256(archivoAudio) 
         } else {
             notificarCambioGlobal()

@@ -24,12 +24,12 @@ android {
             isMinifyEnabled = true
             // Eliminamos recursos que no se utilizan para reducir el tamaño del AAB
             isShrinkResources = true
-            
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            
+
             // Configuración recomendada para producción
             signingConfig = signingConfigs.getByName("debug") // Cambiar por signingConfig de producción en el futuro
         }
