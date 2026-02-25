@@ -3,8 +3,10 @@ package dev.jmcerezo.centinela.ui.componentes
 import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -33,15 +35,32 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import dev.jmcerezo.centinela.core.service.CentinelaService
 import dev.jmcerezo.centinela.core.service.ServicioBotones
+import dev.jmcerezo.centinela.data.local.prefs.Preferencias
+import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 
 @Composable
 fun TopBarApp(onInfoClick: () -> Unit) {
     val contexto = LocalContext.current
+    val prefs = remember { Preferencias(contexto) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var mostrarPanelSeguridad by remember { mutableStateOf(false) }
+    var mostrarPanelAjustes by remember { mutableStateOf(false) }
     var infoPermiso by remember { mutableStateOf<PermisoDetalle?>(null) }
+
+    // ESTADOS AJUSTES
+    var servicioPermanente by remember { mutableStateOf(prefs.servicioPermanente) }
+    var modoSilencioso by remember { mutableStateOf(prefs.modoSilencioso) }
+    var botonesHabilitados by remember { mutableStateOf(prefs.botonesHabilitados) }
+    var seguridadBiometrica by remember { mutableStateOf(prefs.seguridadBiometrica) }
+
+    // INFO DIALOGS
+    var mostrarInfoPermanente by remember { mutableStateOf(false) }
+    var mostrarInfoAntiSuspension by remember { mutableStateOf(false) }
+    var mostrarInfoBotones by remember { mutableStateOf(false) }
+    var mostrarInfoBiometria by remember { mutableStateOf(false) }
 
     // ESTADOS DE PERMISOS
     var accesibilidad by remember { mutableStateOf(false) }
@@ -53,6 +72,26 @@ fun TopBarApp(onInfoClick: () -> Unit) {
 
     val todosLosPermisosOk = accesibilidad && superposicion && bateria && microfono && ubicacion && 
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificaciones else true)
+
+    val sincronizarServicios = {
+        contexto.startService(Intent(contexto, CentinelaService::class.java))
+        contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
+    }
+
+    // RECEPTOR PARA SINCRONIZAR CON EL WIDGET
+    DisposableEffect(contexto) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                servicioPermanente = prefs.servicioPermanente
+                modoSilencioso = prefs.modoSilencioso
+                botonesHabilitados = prefs.botonesHabilitados
+                seguridadBiometrica = prefs.seguridadBiometrica
+            }
+        }
+        val filter = IntentFilter("dev.jmcerezo.ACTUALIZAR_CONFIGURACION")
+        ContextCompat.registerReceiver(contexto, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { contexto.unregisterReceiver(receiver) }
+    }
 
     val actualizarEstados = {
         accesibilidad = isAccessibilityServiceEnabledLocal(contexto, ServicioBotones::class.java)
@@ -92,17 +131,89 @@ fun TopBarApp(onInfoClick: () -> Unit) {
             IconButton(onClick = { mostrarPanelSeguridad = true }) {
                 Icon(
                     imageVector = if (todosLosPermisosOk) Icons.Default.CheckCircle else Icons.Default.Warning,
-                    contentDescription = null,
+                    contentDescription = "Estado de Seguridad",
                     tint = if (todosLosPermisosOk) Color(0xFF00C853) else Color(0xFFFF5252),
                     modifier = Modifier.size(24.dp)
                 )
             }
+            
+            IconButton(onClick = { mostrarPanelAjustes = true }) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Configuración Avanzada",
+                    tint = Color(0xFF3D5AFE),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
             IconButton(onClick = onInfoClick) {
-                Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = Color(0xFF3D5AFE), modifier = Modifier.size(24.dp))
+                Icon(imageVector = Icons.Default.Info, contentDescription = "Información", tint = Color(0xFF3D5AFE), modifier = Modifier.size(24.dp))
             }
         }
     }
 
+    // PANEL DE CONFIGURACIÓN AVANZADA
+    if (mostrarPanelAjustes) {
+        AlertDialog(
+            onDismissRequest = { mostrarPanelAjustes = false },
+            title = { Text("Configuración Avanzada", color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    AjusteInterruptorConInfo(
+                        titulo = "Protección Huella",
+                        subtitulo = "Pedir huella al abrir la app",
+                        activo = seguridadBiometrica,
+                        onInfo = { mostrarInfoBiometria = true },
+                        onToggle = { activado ->
+                            seguridadBiometrica = activado
+                            prefs.seguridadBiometrica = activado
+                        }
+                    )
+
+                    AjusteInterruptorConInfo(
+                        titulo = "Grabación con Botones",
+                        subtitulo = "Usa volumen arriba (x3) para grabar",
+                        activo = botonesHabilitados,
+                        onInfo = { mostrarInfoBotones = true },
+                        onToggle = { activado ->
+                            botonesHabilitados = activado
+                            prefs.botonesHabilitados = activado
+                            sincronizarServicios()
+                        }
+                    )
+
+                    AjusteInterruptorConInfo(
+                        titulo = "Servicio Permanente",
+                        subtitulo = "Evita el cierre automático",
+                        activo = servicioPermanente,
+                        onInfo = { mostrarInfoPermanente = true },
+                        onToggle = { activado ->
+                            servicioPermanente = activado
+                            prefs.servicioPermanente = activado
+                            sincronizarServicios()
+                        }
+                    )
+
+                    AjusteInterruptorConInfo(
+                        titulo = "Modo Anti-Suspensión",
+                        subtitulo = "Escucha con pantalla apagada",
+                        activo = modoSilencioso,
+                        onInfo = { mostrarInfoAntiSuspension = true },
+                        onToggle = { activado ->
+                            modoSilencioso = activado
+                            prefs.modoSilencioso = activado
+                            sincronizarServicios()
+                        }
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { mostrarPanelAjustes = false }) { Text("CERRAR", color = Color(0xFF3D5AFE)) } },
+            containerColor = Color(0xFF1A1D2E),
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    // PANEL DE ESTADO DE SEGURIDAD (PERMISOS)
     if (mostrarPanelSeguridad) {
         AlertDialog(
             onDismissRequest = { mostrarPanelSeguridad = false },
@@ -177,6 +288,54 @@ fun TopBarApp(onInfoClick: () -> Unit) {
             confirmButton = { TextButton(onClick = { mostrarPanelSeguridad = false }) { Text("CERRAR", color = Color(0xFF3D5AFE)) } },
             containerColor = Color(0xFF1A1D2E),
             shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+    // DIÁLOGOS DE INFORMACIÓN DE AJUSTES
+    if (mostrarInfoBiometria) {
+        StructuredInfoDialog(
+            titulo = "Protección Huella",
+            secciones = listOf(
+                "Función" to "Exige autenticación mediante huella dactilar o rostro cada vez que se abre la aplicación.",
+                "Privacidad" to "Tus evidencias estarán seguras aunque prestes el móvil a otra persona.",
+                "Recomendación" to "Mantén esta opción activada para máxima seguridad."
+            ),
+            onDismiss = { mostrarInfoBiometria = false }
+        )
+    }
+
+    if (mostrarInfoBotones) {
+        StructuredInfoDialog(
+            titulo = "Grabación con Botones",
+            secciones = listOf(
+                "Función" to "Permite iniciar o detener la grabación pulsando 3 veces el botón de volumen arriba.",
+                "Recomendación" to "Desactívalo si vas a escuchar música.",
+                "Seguridad" to "Aunque esté desactivado, el botón REC de la pantalla siempre funcionará."
+            ),
+            onDismiss = { mostrarInfoBotones = false }
+        )
+    }
+
+    if (mostrarInfoPermanente) {
+        StructuredInfoDialog(
+            titulo = "Servicio Permanente",
+            secciones = listOf(
+                "Función" to "Mantiene la app en memoria para actuar siempre.",
+                "Batería" to "Consumo insignificante (0%)."
+            ),
+            onDismiss = { mostrarInfoPermanente = false }
+        )
+    }
+
+    if (mostrarInfoAntiSuspension) {
+        StructuredInfoDialog(
+            titulo = "Modo Anti-Suspensión",
+            secciones = listOf(
+                "Función" to "Fuerza la escucha con pantalla apagada.",
+                "Caso de Uso" to "Actívalo solo para grabaciones discretas.",
+                "Batería" to "Consumo moderado. Desactívalo al terminar."
+            ),
+            onDismiss = { mostrarInfoAntiSuspension = false }
         )
     }
 
