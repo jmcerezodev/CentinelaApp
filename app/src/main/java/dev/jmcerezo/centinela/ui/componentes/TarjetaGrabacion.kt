@@ -42,11 +42,13 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
     var servicioPermanente by remember { mutableStateOf(prefs.servicioPermanente) }
     var modoSilencioso by remember { mutableStateOf(prefs.modoSilencioso) }
     var botonesHabilitados by remember { mutableStateOf(prefs.botonesHabilitados) }
+    var seguridadBiometrica by remember { mutableStateOf(prefs.seguridadBiometrica) }
 
     var mostrarAjustes by remember { mutableStateOf(false) }
     var mostrarInfoPermanente by remember { mutableStateOf(false) }
     var mostrarInfoAntiSuspension by remember { mutableStateOf(false) }
     var mostrarInfoBotones by remember { mutableStateOf(false) }
+    var mostrarInfoBiometria by remember { mutableStateOf(false) }
 
     // RECEPTOR PARA SINCRONIZAR CON EL WIDGET
     DisposableEffect(contexto) {
@@ -138,6 +140,19 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.Gray.copy(alpha = 0.1f))
 
                         AjusteInterruptorConInfo(
+                            titulo = "Protección Huella",
+                            subtitulo = "Pedir huella al abrir la app",
+                            activo = seguridadBiometrica,
+                            onInfo = { mostrarInfoBiometria = true },
+                            onToggle = { activado ->
+                                seguridadBiometrica = activado
+                                prefs.seguridadBiometrica = activado
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        AjusteInterruptorConInfo(
                             titulo = "Grabación con Botones",
                             subtitulo = "Usa volumen arriba (x3) para grabar",
                             activo = botonesHabilitados,
@@ -183,6 +198,18 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
     }
 
     // DIÁLOGOS DE INFORMACIÓN
+    if (mostrarInfoBiometria) {
+        StructuredInfoDialog(
+            titulo = "Protección Huella",
+            secciones = listOf(
+                "Función" to "Exige autenticación mediante huella dactilar o rostro cada vez que se abre la aplicación.",
+                "Privacidad" to "Tus evidencias estarán seguras aunque prestes el móvil a otra persona.",
+                "Recomendación" to "Mantén esta opción activada para máxima seguridad."
+            ),
+            onDismiss = { mostrarInfoBiometria = false }
+        )
+    }
+
     if (mostrarInfoBotones) {
         StructuredInfoDialog(
             titulo = "Grabación con Botones",

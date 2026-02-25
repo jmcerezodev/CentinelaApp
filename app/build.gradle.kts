@@ -20,19 +20,35 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Habilitamos la ofuscación y optimización de código (R8)
+            isMinifyEnabled = true
+            // Eliminamos recursos que no se utilizan para reducir el tamaño del AAB
+            isShrinkResources = true
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            // Configuración recomendada para producción
+            signingConfig = signingConfigs.getByName("debug") // Cambiar por signingConfig de producción en el futuro
         }
     }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    
     buildFeatures {
         compose = true
+    }
+
+    // Configuración específica para App Bundle
+    bundle {
+        language { enableSplit = true }
+        density { enableSplit = true }
+        abi { enableSplit = true }
     }
 }
 

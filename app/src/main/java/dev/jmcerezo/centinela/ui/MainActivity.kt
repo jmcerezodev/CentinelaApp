@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
 import dev.jmcerezo.centinela.data.local.db.GrabacionDato
+import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 import dev.jmcerezo.centinela.ui.componentes.*
 import dev.jmcerezo.centinela.ui.componentes.dialogos.*
 import dev.jmcerezo.centinela.ui.theme.CentinelaTheme
@@ -27,11 +28,10 @@ import dev.jmcerezo.centinela.util.PdfReportGenerator
 
 /**
  * Actividad principal de la aplicación Centinela.
- * Gestiona la autenticación biométrica y la solicitud de permisos críticos.
+ * Gestiona la autenticación biométrica opcional y la solicitud de permisos críticos.
  */
 class MainActivity : AppCompatActivity() {
 
-    // Launcher para solicitar los permisos necesarios para la captura legal
     private val solicitudPermisosLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { resultados ->
@@ -44,14 +44,12 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Configuración de pantalla completa y barras transparentes
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.Companion.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.Companion.dark(Color.TRANSPARENT)
         )
         super.onCreate(savedInstanceState)
 
-        // Lanzamos la solicitud de permisos al arrancar
         solicitudPermisosLauncher.launch(
             arrayOf(
                 Manifest.permission.RECORD_AUDIO,
@@ -63,20 +61,22 @@ class MainActivity : AppCompatActivity() {
         setContent {
             CentinelaTheme {
                 val contexto = LocalContext.current
+                val prefs = remember { Preferencias(contexto) }
                 val motor = remember { GrabadoraMotor.getInstance(contexto) }
                 val viewModel: GrabacionViewModel = viewModel()
 
-                // Estado de autenticación para proteger la UI
-                var estaAutenticado by remember { mutableStateOf(!BiometricHelper.esBiometriaDisponible(this@MainActivity)) }
+                // Si la biometría está desactivada en ajustes, entramos directamente
+                var estaAutenticado by remember { 
+                    mutableStateOf(!prefs.seguridadBiometrica || !BiometricHelper.esBiometriaDisponible(contexto)) 
+                }
 
-                // Disparamos la autenticación al iniciar si está disponible
                 LaunchedEffect(Unit) {
-                    if (BiometricHelper.esBiometriaDisponible(this@MainActivity)) {
+                    if (prefs.seguridadBiometrica && BiometricHelper.esBiometriaDisponible(contexto)) {
                         BiometricHelper.autenticar(
                             actividad = this@MainActivity,
                             onExito = { estaAutenticado = true },
                             onError = { error ->
-                                Toast.makeText(this@MainActivity, "Acceso denegado: $error", Toast.LENGTH_LONG).show()
+                                Toast.makeText(this@MainActivity, "Acceso denegado", Toast.LENGTH_LONG).show()
                                 if (error.contains("cancel", true)) finish()
                             }
                         )

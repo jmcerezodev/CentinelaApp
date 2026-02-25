@@ -30,4 +30,11 @@ class Preferencias(context: Context) {
     var botonesHabilitados: Boolean
         get() = prefs.getBoolean("botones_habilitados", true)
         set(value) = prefs.edit().putBoolean("botones_habilitados", value).apply()
+
+    /**
+     * Determina si la seguridad biométrica está habilitada al abrir la aplicación.
+     */
+    var seguridadBiometrica: Boolean
+        get() = prefs.getBoolean("seguridad_biometrica", true)
+        set(value) = prefs.edit().putBoolean("seguridad_biometrica", value).apply()
 }

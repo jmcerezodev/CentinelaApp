@@ -1,21 +1,31 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Reglas específicas para iText7 (Generación de PDF)
+-keep class com.itextpdf.** { *; }
+-dontwarn com.itextpdf.**
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# SLF4J - Ignorar advertencias de clases faltantes (Común en iText7)
+-dontwarn org.slf4j.**
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Reglas para Room Database
+-keep class * extends androidx.room.RoomDatabase
+-keep class * extends androidx.room.Entity
+-keep class * extends androidx.room.Dao
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Reglas para Google Play Services (Location)
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+
+# Reglas para Jetpack Glance (Widgets)
+-keep class androidx.glance.** { *; }
+-dontwarn androidx.glance.**
+
+# Evitar que R8 elimine clases necesarias para la Biometría
+-dontwarn androidx.biometric.**
+
+# Ignorar advertencias de dependencias de Java SE que no existen en Android
+-dontwarn javax.annotation.**
+-dontwarn java.awt.**
+-dontwarn javax.naming.**
+
+# Preservar atributos necesarios para el debugging en release
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
