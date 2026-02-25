@@ -40,7 +40,7 @@ fun ListaEvidencias(
     if (lista.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                text = "No hay grabaciones disponibles",
+                text = "No hay grabaciones",
                 color = Color.Gray,
                 fontSize = 14.sp
             )

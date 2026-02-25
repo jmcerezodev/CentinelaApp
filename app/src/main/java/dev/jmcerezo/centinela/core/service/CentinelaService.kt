@@ -42,14 +42,10 @@ class CentinelaService : Service() {
     private var mediaSession: MediaSession? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
-    private var contadorPulsaciones = 0
-    private var ultimaPulsacion: Long = 0
-    private var ultimaPulsacionProcesada: Long = 0
-    private var ultimaAccionMotor: Long = 0
-
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
+                "dev.jmcerezo.ACTUALIZAR_CONFIGURACION" -> actualizarEstado()
                 Intent.ACTION_SCREEN_OFF -> asegurarMargenVolumen()
                 "android.media.VOLUME_CHANGED_ACTION" -> {
                     if (!prefs.botonesHabilitados) return
@@ -57,7 +53,10 @@ class CentinelaService : Service() {
                     if (streamType == AudioManager.STREAM_MUSIC) {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
-                        if (nuevoVol > antiguoVol) registrarPulsacion()
+                        
+                        // Delegamos la detección al motor para evitar duplicados si ServicioBotones también está activo
+                        if (nuevoVol > antiguoVol) motor.registrarPulsacion()
+                        
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
                         }
@@ -75,6 +74,7 @@ class CentinelaService : Service() {
         powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
 
         val filter = IntentFilter().apply {
+            addAction("dev.jmcerezo.ACTUALIZAR_CONFIGURACION")
             addAction("android.media.VOLUME_CHANGED_ACTION")
             addAction(Intent.ACTION_SCREEN_OFF)
         }
@@ -83,49 +83,7 @@ class CentinelaService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         actualizarEstado()
-        // START_STICKY asegura que Android intente recrear el servicio si lo mata por falta de memoria
         return START_STICKY
-    }
-
-    private fun registrarPulsacion() {
-        val tiempoActual = System.currentTimeMillis()
-        if (tiempoActual - ultimaAccionMotor < 2000) return
-        if (tiempoActual - ultimaPulsacionProcesada < 100) return
-        ultimaPulsacionProcesada = tiempoActual
-
-        if (tiempoActual - ultimaPulsacion < 1000) {
-            contadorPulsaciones++
-        } else {
-            contadorPulsaciones = 1
-        }
-        ultimaPulsacion = tiempoActual
-
-        if (contadorPulsaciones == 3) {
-            gestionarGrabacion()
-            contadorPulsaciones = 0
-            ultimaAccionMotor = System.currentTimeMillis()
-        }
-    }
-
-    private fun gestionarGrabacion() {
-        if (motor.estaGrabando) {
-            motor.detenerGrabacion()
-            // Al parar, volvemos a la notificación normal
-            actualizarEstado()
-            sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_LISTA").setPackage(packageName))
-        } else {
-            motor.iniciarGrabacion()
-            // Al grabar, reforzamos la prioridad del servicio
-            mostrarNotificacion(grabando = true)
-            adquirirWakeLockForzado()
-        }
-    }
-
-    private fun adquirirWakeLockForzado() {
-        if (wakeLock?.isHeld == true) wakeLock?.release()
-        // El tag "Centinela:Recording" ayuda a identificar el proceso en los logs de Android
-        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Centinela:Recording")
-        wakeLock?.acquire(1 * 60 * 60 * 1000L) // Bloqueo de 1 hora de seguridad
     }
 
     private fun asegurarMargenVolumen() {
@@ -138,9 +96,9 @@ class CentinelaService : Service() {
     }
 
     private fun actualizarEstado() {
-        if (prefs.servicioPermanente || prefs.modoSilencioso) {
+        if (prefs.servicioPermanente || prefs.modoSilencioso || motor.estaGrabando) {
             mostrarNotificacion(grabando = motor.estaGrabando)
-        } else if (!motor.estaGrabando) {
+        } else {
             detenerTodo()
             stopSelf()
             return
@@ -216,6 +174,12 @@ class CentinelaService : Service() {
                 } catch (e: Exception) {}
             }.apply { start() }
         }
+    }
+
+    private fun adquirirWakeLockForzado() {
+        if (wakeLock?.isHeld == true) wakeLock?.release()
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Centinela:Recording")
+        wakeLock?.acquire(1 * 60 * 60 * 1000L)
     }
 
     private fun detenerModoAntiSuspension() {

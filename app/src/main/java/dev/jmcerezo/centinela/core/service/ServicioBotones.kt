@@ -27,8 +27,6 @@ import dev.jmcerezo.centinela.data.local.prefs.Preferencias
  * SERVICIO DE ACCESIBILIDAD: CENTINELA
  * 
  * Responsabilidad: Detectar las pulsaciones de los botones físicos de volumen.
- * Este servicio implementa múltiples estrategias para evitar que Android suspenda
- * la escucha cuando la pantalla se apaga.
  */
 @SuppressLint("AccessibilityService")
 class ServicioBotones : AccessibilityService() {
@@ -41,28 +39,22 @@ class ServicioBotones : AccessibilityService() {
     private var wakeLock: PowerManager.WakeLock? = null
     private lateinit var audioManager: AudioManager
     private lateinit var powerManager: PowerManager
-    
-    private var contadorPulsaciones = 0
-    private var ultimaPulsacion: Long = 0
-    private var ultimaPulsacionProcesada: Long = 0
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 "dev.jmcerezo.ACTUALIZAR_CONFIGURACION" -> actualizarEstadoServicio()
-                // REARME PREVENTIVO: Al apagar la pantalla, preparamos el botón
                 Intent.ACTION_SCREEN_OFF -> asegurarMargenVolumen()
                 "android.media.VOLUME_CHANGED_ACTION" -> {
-                    // Solo procesamos si los botones están habilitados en ajustes
                     if (!prefs.botonesHabilitados) return
-
                     val streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
                     if (streamType == AudioManager.STREAM_MUSIC) {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
-                        if (nuevoVol > antiguoVol) registrarPulsacion()
+                        
+                        // Delegamos la detección al motor para evitar duplicados
+                        if (nuevoVol > antiguoVol) motor.registrarPulsacion()
 
-                        // Si el volumen llega al máximo con pantalla apagada, bajamos un punto para rearmar
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
                         }
@@ -74,7 +66,6 @@ class ServicioBotones : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        // Corregido: Usamos getInstance() ya que el constructor es privado (Singleton)
         motor = GrabadoraMotor.getInstance(this)
         prefs = Preferencias(this)
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
@@ -97,7 +88,6 @@ class ServicioBotones : AccessibilityService() {
         }
 
         ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-
         actualizarEstadoServicio()
     }
 
@@ -163,7 +153,7 @@ class ServicioBotones : AccessibilityService() {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Sistema Centinela"
-            val mChannel = NotificationChannel(channelId, name, NotificationManager.IMPORTANCE_DEFAULT)
+            val mChannel = NotificationChannel(channelId, name, NotificationManager.IMPORTANCE_LOW)
             notificationManager.createNotificationChannel(mChannel)
         }
 
@@ -253,43 +243,15 @@ class ServicioBotones : AccessibilityService() {
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
-        // Solo procesamos si los botones están habilitados en ajustes
         if (!prefs.botonesHabilitados) return false
-
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-                registrarPulsacion()
+                // Delegamos al motor
+                motor.registrarPulsacion()
             }
             return false 
         }
         return false
-    }
-
-    private fun registrarPulsacion() {
-        val tiempoActual = System.currentTimeMillis()
-        if (tiempoActual - ultimaPulsacionProcesada < 100) return
-        ultimaPulsacionProcesada = tiempoActual
-
-        if (tiempoActual - ultimaPulsacion < 1000) {
-            contadorPulsaciones++
-        } else {
-            contadorPulsaciones = 1
-        }
-        ultimaPulsacion = tiempoActual
-
-        if (contadorPulsaciones == 3) {
-            gestionarGrabacion()
-            contadorPulsaciones = 0
-        }
-    }
-
-    private fun gestionarGrabacion() {
-        if (motor.estaGrabando) {
-            motor.detenerGrabacion()
-            sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_LISTA").setPackage(packageName))
-        } else {
-            motor.iniciarGrabacion()
-        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}

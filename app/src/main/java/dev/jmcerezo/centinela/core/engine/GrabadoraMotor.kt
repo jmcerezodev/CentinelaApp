@@ -3,15 +3,8 @@ package dev.jmcerezo.centinela.core.engine
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.location.Geocoder
-import android.media.AudioAttributes
-import android.media.MediaPlayer
-import android.media.MediaRecorder
 import android.os.*
 import android.util.Log
-import androidx.core.content.FileProvider
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import dev.jmcerezo.centinela.core.engine.helpers.*
 import dev.jmcerezo.centinela.data.local.db.AppDatabase
 import dev.jmcerezo.centinela.data.local.db.GrabacionDato
@@ -25,7 +18,6 @@ import java.util.Locale
 
 /**
  * MOTOR DE GRABACIÓN CENTINELA (Singleton)
- * Único punto de control para el hardware y la lógica de pulsaciones.
  */
 class GrabadoraMotor private constructor(private val contexto: Context) {
 
@@ -42,10 +34,10 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     var estaGrabando: Boolean = false
         private set
 
-    // Lógica de pulsaciones unificada
     private var contadorPulsaciones = 0
     private var ultimaPulsacion: Long = 0
     private var ultimaAccionExitosa: Long = 0
+    private var ultimaPulsacionRecibida: Long = 0
 
     companion object {
         @Volatile private var INSTANCE: GrabadoraMotor? = null
@@ -57,14 +49,18 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     }
 
     /**
-     * Procesa una pulsación de volumen.
-     * Solo el motor decide si se alcanza el umbral de 3 clics.
+     * Procesa una pulsación de volumen con filtros de seguridad.
      */
     fun registrarPulsacion() {
         val ahora = System.currentTimeMillis()
 
-        // Bloqueo de seguridad: Evita que ráfagas duplicadas de diferentes servicios
-        // disparen la grabación varias veces seguidas (Anti-Rebote)
+        // 1. FILTRO ANTI-DUPLICADOS (Multi-source): 
+        // Ignora si recibimos eventos de diferentes servicios para el mismo clic (ventana de 150ms)
+        if (ahora - ultimaPulsacionRecibida < 150) return
+        ultimaPulsacionRecibida = ahora
+
+        // 2. BLOQUEO POST-ACCION: 
+        // Evita que ráfagas accidentales tras iniciar/parar cambien el estado (ventana de 2 seg)
         if (ahora - ultimaAccionExitosa < 2000) return
 
         if (ahora - ultimaPulsacion < 1000) {
@@ -144,23 +140,15 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         }
     }
 
-    /**
-     * Cambia el nombre de la evidencia tanto en el sistema de archivos como en la base de datos.
-     */
     fun renombrarGrabacion(grabacion: GrabacionDato, nuevoNombre: String) {
         scope.launch {
             try {
                 val nombreLimpio = nuevoNombre.trim().replace(Regex("[^a-zA-Z0-9_\\- ]"), "_")
                 if (nombreLimpio.isEmpty()) return@launch
-
                 val archivoOriginal = File(grabacion.rutaArchivo)
                 val nuevoArchivo = File(archivoOriginal.parent, "$nombreLimpio.m4a")
-
                 if (archivoOriginal.exists() && archivoOriginal.renameTo(nuevoArchivo)) {
-                    dao.update(grabacion.copy(
-                        nombre = nombreLimpio,
-                        rutaArchivo = nuevoArchivo.absolutePath
-                    ))
+                    dao.update(grabacion.copy(nombre = nombreLimpio, rutaArchivo = nuevoArchivo.absolutePath))
                 }
             } catch (e: Exception) {
                 Log.e("Centinela", "Error al renombrar: ${e.message}")
