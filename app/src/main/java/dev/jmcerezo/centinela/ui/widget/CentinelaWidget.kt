@@ -71,7 +71,7 @@ class ToggleAction : ActionCallback {
         // Actualizamos el estado interno del widget para que el redibujado sea inmediato
         updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { currentPrefs ->
             val mutablePrefs = currentPrefs.toMutablePreferences()
-            
+
             when (accion) {
                 "grabar" -> {
                     if (motor.estaGrabando) motor.detenerGrabacion() else motor.iniciarGrabacion()

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="#1A1D2E" />
-    <corners android:radius="16dp" />
-    <stroke android:width="1dp" android:color="#3D5AFE" />
+    <!-- Aumentamos el radio a 28dp para que encaje perfectamente con las pilas de widgets modernas de Android -->
+    <corners android:radius="28dp" />
+    <stroke android:width="1.5dp" android:color="#3D5AFE" />
 </shape>

@@ -1,19 +1,23 @@
 package dev.jmcerezo.centinela.ui.widget
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.*
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.color.ColorProvider
 import androidx.glance.layout.*
+import androidx.glance.text.*
 import dev.jmcerezo.centinela.R
 
 /**
  * INTERFAZ VISUAL PREMIUM DEL WIDGET CENTINELA
  * 
- * Diseño minimalista basado en iconos con botón de grabación directa.
- * Optimizado para ser apilable en las pilas de widgets de Android.
+ * Diseño de tarjetas que simulan botones físicos.
+ * Las esquinas exteriores de los laterales están redondeadas (24dp).
  */
 @Composable
 fun CentinelaWidgetContent(
@@ -26,91 +30,109 @@ fun CentinelaWidgetContent(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ImageProvider(R.drawable.widget_bg))
-            .padding(horizontal = 4.dp),
+            .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // --- BOTÓN PRINCIPAL DE GRABACIÓN (🎙️ / ⏹️) ---
-        WidgetIconAction(
-            iconRes = if (grabando) android.R.drawable.ic_media_pause else android.R.drawable.ic_btn_speak_now,
+        // --- TARJETA 1: REC / STOP (Redondeada Izquierda) ---
+        WidgetCard(
             activo = grabando,
             prefKey = "grabar",
-            isMain = true
-        )
+            bgRes = R.drawable.btn_left_rounded
+        ) {
+            val tint = if (grabando) Color(0xFFFF5252) else Color.White
+            Image(
+                provider = ImageProvider(if (grabando) android.R.drawable.ic_media_pause else android.R.drawable.ic_btn_speak_now),
+                contentDescription = null,
+                modifier = GlanceModifier.size(26.dp),
+                colorFilter = ColorFilter.tint(ColorProvider(tint, tint))
+            )
+        }
 
-        VerticalLine()
+        Spacer(modifier = GlanceModifier.width(2.dp))
 
-        // --- MODO 1: GRABACIÓN POR BOTONES (⚙️) ---
-        WidgetIconAction(
-            iconRes = android.R.drawable.ic_menu_preferences,
+        // --- TARJETA 2: BOTONES (Cuadrada) ---
+        WidgetCard(
             activo = botones,
-            prefKey = "botones"
-        )
+            prefKey = "botones",
+            bgRes = R.drawable.btn_square
+        ) {
+            WidgetLabel("BOTONES", botones)
+        }
 
-        // --- MODO 2: SERVICIO PERMANENTE (🛡️) ---
-        WidgetIconAction(
-            iconRes = android.R.drawable.ic_lock_idle_lock,
+        Spacer(modifier = GlanceModifier.width(2.dp))
+
+        // --- TARJETA 3: SERVICIO (Cuadrada) ---
+        WidgetCard(
             activo = permanente,
-            prefKey = "permanente"
-        )
+            prefKey = "permanente",
+            bgRes = R.drawable.btn_square
+        ) {
+            WidgetLabel("SERV PERMANENTE", permanente)
+        }
 
-        // --- MODO 3: ANTI-SUSPENSIÓN (⚡) ---
-        WidgetIconAction(
-            iconRes = android.R.drawable.ic_media_play,
+        Spacer(modifier = GlanceModifier.width(2.dp))
+
+        // --- TARJETA 4: VIGILIA (Redondeada Derecha) ---
+        WidgetCard(
             activo = silencioso,
-            prefKey = "suspension"
-        )
+            prefKey = "suspension",
+            bgRes = R.drawable.btn_right_rounded
+        ) {
+            WidgetLabel("ANTI-SUSPENSION", silencioso)
+        }
     }
 }
 
 /**
- * Elemento de icono individual con lógica de visualización profesional.
+ * Módulo de tarjeta individual que simula un botón.
  */
 @Composable
-private fun RowScope.WidgetIconAction(
-    iconRes: Int,
+private fun RowScope.WidgetCard(
     activo: Boolean,
     prefKey: String,
-    isMain: Boolean = false
+    bgRes: Int,
+    content: @Composable () -> Unit
 ) {
-    Column(
+    Box(
         modifier = GlanceModifier
             .defaultWeight()
             .fillMaxHeight()
+            .background(ImageProvider(bgRes))
             .clickable(actionRunCallback<ToggleAction>(
                 actionParametersOf(CentinelaWidget.PARAM_ACCION to prefKey)
             )),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalAlignment = Alignment.CenterVertically
+        contentAlignment = Alignment.Center
     ) {
-        // Aplicamos color rojo al icono principal si está grabando, blanco al resto
-        val tintColor = if (isMain && activo) GlanceTheme.colors.error else GlanceTheme.colors.onSurface
-        
-        Image(
-            provider = ImageProvider(iconRes),
-            contentDescription = null,
-            modifier = GlanceModifier.size(if (isMain) 32.dp else 26.dp),
-            colorFilter = ColorFilter.tint(tintColor)
-        )
-        
-        Spacer(modifier = GlanceModifier.height(6.dp))
-        
-        // Indicador LED de estado
-        Image(
-            provider = ImageProvider(if (activo) R.drawable.indicador_on else R.drawable.indicador_off),
-            contentDescription = null,
-            modifier = GlanceModifier.size(8.dp)
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            content()
+            Spacer(modifier = GlanceModifier.height(6.dp))
+            // Punto LED indicador
+            Image(
+                provider = ImageProvider(if (activo) R.drawable.indicador_on else R.drawable.indicador_off),
+                contentDescription = null,
+                modifier = GlanceModifier.size(6.dp)
+            )
+        }
     }
 }
 
+/**
+ * Estilo de texto para las tarjetas de control.
+ */
 @Composable
-private fun VerticalLine() {
-    Box(
-        modifier = GlanceModifier
-            .width(1.dp)
-            .fillMaxHeight()
-            .padding(vertical = 12.dp)
-            .background(ImageProvider(R.drawable.indicador_off))
-    ) {}
+private fun WidgetLabel(text: String, activo: Boolean) {
+    val color = if (activo) Color.White else Color(0xFF808080)
+    Text(
+        text = text,
+        style = TextStyle(
+            color = ColorProvider(color, color),
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    )
 }
