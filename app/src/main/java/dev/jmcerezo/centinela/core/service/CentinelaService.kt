@@ -28,7 +28,7 @@ import dev.jmcerezo.centinela.data.local.prefs.Preferencias
  * SERVICIO DE PERSISTENCIA Y DETECCIÓN EN SEGUNDO PLANO
  * 
  * Gestiona la notificación, el silencio digital y la detección de volumen
- * cuando la pantalla está apagada.
+ * asegurando que Android no mate el proceso durante la grabación.
  */
 class CentinelaService : Service() {
 
@@ -52,18 +52,12 @@ class CentinelaService : Service() {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_OFF -> asegurarMargenVolumen()
                 "android.media.VOLUME_CHANGED_ACTION" -> {
-                    // Solo procesamos si los botones están habilitados en ajustes
                     if (!prefs.botonesHabilitados) return
-
                     val streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
                     if (streamType == AudioManager.STREAM_MUSIC) {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
-                        
-                        if (nuevoVol > antiguoVol) {
-                            registrarPulsacion()
-                        }
-                        
+                        if (nuevoVol > antiguoVol) registrarPulsacion()
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
                         }
@@ -89,12 +83,12 @@ class CentinelaService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         actualizarEstado()
+        // START_STICKY asegura que Android intente recrear el servicio si lo mata por falta de memoria
         return START_STICKY
     }
 
     private fun registrarPulsacion() {
         val tiempoActual = System.currentTimeMillis()
-        
         if (tiempoActual - ultimaAccionMotor < 2000) return
         if (tiempoActual - ultimaPulsacionProcesada < 100) return
         ultimaPulsacionProcesada = tiempoActual
@@ -116,10 +110,22 @@ class CentinelaService : Service() {
     private fun gestionarGrabacion() {
         if (motor.estaGrabando) {
             motor.detenerGrabacion()
+            // Al parar, volvemos a la notificación normal
+            actualizarEstado()
             sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_LISTA").setPackage(packageName))
         } else {
             motor.iniciarGrabacion()
+            // Al grabar, reforzamos la prioridad del servicio
+            mostrarNotificacion(grabando = true)
+            adquirirWakeLockForzado()
         }
+    }
+
+    private fun adquirirWakeLockForzado() {
+        if (wakeLock?.isHeld == true) wakeLock?.release()
+        // El tag "Centinela:Recording" ayuda a identificar el proceso en los logs de Android
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Centinela:Recording")
+        wakeLock?.acquire(1 * 60 * 60 * 1000L) // Bloqueo de 1 hora de seguridad
     }
 
     private fun asegurarMargenVolumen() {
@@ -133,36 +139,41 @@ class CentinelaService : Service() {
 
     private fun actualizarEstado() {
         if (prefs.servicioPermanente || prefs.modoSilencioso) {
-            mostrarNotificacion()
-        } else {
+            mostrarNotificacion(grabando = motor.estaGrabando)
+        } else if (!motor.estaGrabando) {
             detenerTodo()
             stopSelf()
             return
         }
 
-        if (prefs.modoSilencioso) {
+        if (prefs.modoSilencioso || motor.estaGrabando) {
             iniciarModoAntiSuspension()
         } else {
             detenerModoAntiSuspension()
         }
     }
 
-    private fun mostrarNotificacion() {
+    private fun mostrarNotificacion(grabando: Boolean) {
         val channelId = "centinela_status"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(channelId, "Estado Centinela", NotificationManager.IMPORTANCE_LOW)
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager?.createNotificationChannel(channel)
         }
 
-        val texto = if (prefs.modoSilencioso) "Modo Anti-Suspensión activo" else "Servicio de seguridad activo"
+        val titulo = if (grabando) "CENTINELA: CAPTURANDO EVIDENCIA" else "Sistema Centinela"
+        val texto = when {
+            grabando -> "La grabación está activa y protegida."
+            prefs.modoSilencioso -> "Modo Anti-Suspensión activo"
+            else -> "Servicio de seguridad activo"
+        }
 
         val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Sistema Centinela")
+            .setContentTitle(titulo)
             .setContentText(texto)
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(if (grabando) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
             .build()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -188,8 +199,7 @@ class CentinelaService : Service() {
         }
 
         if (wakeLock == null) {
-            wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Centinela:KeepAlive")
-            wakeLock?.acquire(2 * 60 * 60 * 1000L)
+            adquirirWakeLockForzado()
         }
 
         if (audioTrackSilencio == null) {
@@ -216,14 +226,16 @@ class CentinelaService : Service() {
         mediaSession?.isActive = false
         mediaSession?.release()
         mediaSession = null
-        if (wakeLock?.isHeld == true) wakeLock?.release()
-        wakeLock = null
+        if (!motor.estaGrabando && wakeLock?.isHeld == true) {
+            wakeLock?.release()
+            wakeLock = null
+        }
     }
 
     private fun detenerTodo() {
         detenerModoAntiSuspension()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(Service.STOP_FOREGROUND_REMOVE)
+            stopForeground(STOP_FOREGROUND_REMOVE)
         } else {
             @Suppress("DEPRECATION")
             stopForeground(true)
@@ -233,7 +245,7 @@ class CentinelaService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        unregisterReceiver(receiver)
+        try { unregisterReceiver(receiver) } catch (e: Exception) {}
         detenerTodo()
         super.onDestroy()
     }

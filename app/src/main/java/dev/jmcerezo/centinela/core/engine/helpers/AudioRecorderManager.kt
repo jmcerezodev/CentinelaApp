@@ -11,6 +11,7 @@ import java.io.File
 
 /**
  * Gestor especializado en el hardware de grabación (MediaRecorder).
+ * Optimizado para captura de voz clara en entornos difíciles (bolsillos, bolsos).
  */
 class AudioRecorderManager(private val contexto: Context) {
 
@@ -18,7 +19,7 @@ class AudioRecorderManager(private val contexto: Context) {
     private var archivoActual: File? = null
 
     /**
-     * Configura e inicia el micrófono.
+     * Configura e inicia el micrófono con parámetros de alta fidelidad para voz.
      */
     fun iniciar(archivo: File): Boolean {
         archivoActual = archivo
@@ -29,9 +30,16 @@ class AudioRecorderManager(private val contexto: Context) {
                 @Suppress("DEPRECATION")
                 MediaRecorder()
             }.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
+                // CAMBIO CLAVE: VOICE_RECOGNITION activa los filtros de ruido del hardware
+                setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                
+                // AJUSTES DE CALIDAD: Voces nítidas y volumen equilibrado
+                setAudioChannels(1) // Mono es mejor para centrar la captura en la voz
+                setAudioSamplingRate(44100) // Calidad profesional (44.1 kHz)
+                setAudioEncodingBitRate(128000) // 128 kbps para evitar compresión brusca
+                
                 setOutputFile(archivo.absolutePath)
                 prepare()
                 start()
@@ -57,6 +65,7 @@ class AudioRecorderManager(private val contexto: Context) {
             grabador = null
             archivoActual
         } catch (e: Exception) {
+            Log.e("Centinela", "Error al detener grabación: ${e.message}")
             null
         }
     }
