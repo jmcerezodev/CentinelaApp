@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun FooterApp() {
     Text(
-        text = "Desarrollado por JMCerezoDev",
+        text = "Desarrollado por JMCerezo",
         color = Color.Gray.copy(alpha = 0.5f),
         fontSize = 10.sp,
         modifier = Modifier

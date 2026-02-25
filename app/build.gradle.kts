@@ -47,6 +47,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
 
+    // AndroidX AppCompat (Necesaria para Biometric)
+    implementation("androidx.appcompat:appcompat:1.7.0")
+
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
@@ -58,6 +61,9 @@ dependencies {
 
     // PDF Generation
     implementation(libs.itext7.core)
+
+    // Biometric Security
+    implementation(libs.androidx.biometric)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

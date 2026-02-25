@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Tema Principal de la App -->
-    <style name="Theme.Centinela" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- Tema compatible con AppCompat y Biometría -->
+    <style name="Theme.Centinela" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">#0F111A</item>
         <item name="android:statusBarColor">#0F111A</item>
+        <item name="android:windowNoTitle">true</item>
     </style>
 </resources>

@@ -27,7 +27,7 @@ import dev.jmcerezo.centinela.data.local.prefs.Preferencias
  * SERVICIO DE ACCESIBILIDAD: CENTINELA
  * 
  * Responsabilidad: Detectar las pulsaciones de los botones físicos de volumen.
- * Este servicio implementa múltiples estrategias para evitar que Android suspenda 
+ * Este servicio implementa múltiples estrategias para evitar que Android suspenda
  * la escucha cuando la pantalla se apaga.
  */
 @SuppressLint("AccessibilityService")
@@ -61,7 +61,7 @@ class ServicioBotones : AccessibilityService() {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
                         if (nuevoVol > antiguoVol) registrarPulsacion()
-                        
+
                         // Si el volumen llega al máximo con pantalla apagada, bajamos un punto para rearmar
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
@@ -95,7 +95,7 @@ class ServicioBotones : AccessibilityService() {
             addAction("android.media.VOLUME_CHANGED_ACTION")
             addAction(Intent.ACTION_SCREEN_OFF)
         }
-        
+
         ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         actualizarEstadoServicio()
@@ -160,7 +160,7 @@ class ServicioBotones : AccessibilityService() {
     private fun mostrarNotificacionActiva() {
         val channelId = "centinela_servicio"
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Sistema Centinela"
             val mChannel = NotificationChannel(channelId, name, NotificationManager.IMPORTANCE_DEFAULT)

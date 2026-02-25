@@ -57,12 +57,12 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     }
 
     /**
-     * Procesa una pulsación de volumen. 
+     * Procesa una pulsación de volumen.
      * Solo el motor decide si se alcanza el umbral de 3 clics.
      */
     fun registrarPulsacion() {
         val ahora = System.currentTimeMillis()
-        
+
         // Bloqueo de seguridad: Evita que ráfagas duplicadas de diferentes servicios
         // disparen la grabación varias veces seguidas (Anti-Rebote)
         if (ahora - ultimaAccionExitosa < 2000) return
