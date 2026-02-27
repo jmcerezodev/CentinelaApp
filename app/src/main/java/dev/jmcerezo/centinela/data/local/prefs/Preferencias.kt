@@ -26,9 +26,10 @@ class Preferencias(context: Context) {
 
     /**
      * Determina si la grabación mediante los botones de volumen está habilitada.
+     * Ajustado: Ahora desactivado por defecto al instalar la aplicación.
      */
     var botonesHabilitados: Boolean
-        get() = prefs.getBoolean("botones_habilitados", true)
+        get() = prefs.getBoolean("botones_habilitados", false)
         set(value) = prefs.edit().putBoolean("botones_habilitados", value).apply()
 
     /**

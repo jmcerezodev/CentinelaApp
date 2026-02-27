@@ -222,9 +222,14 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                         activo = servicioPermanente,
                         onInfo = { mostrarInfoPermanente = true },
                         onToggle = { activado ->
-                            servicioPermanente = activado
-                            prefs.servicioPermanente = activado
-                            sincronizarServicios()
+                            // Si activa y no tiene permiso de notificaciones (en Android 13+)
+                            if (activado && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificaciones) {
+                                consentimientoActual = PermisoConsentimiento.Notificaciones
+                            } else {
+                                servicioPermanente = activado
+                                prefs.servicioPermanente = activado
+                                sincronizarServicios()
+                            }
                         }
                     )
 
@@ -234,9 +239,14 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                         activo = modoSilencioso,
                         onInfo = { mostrarInfoAntiSuspension = true },
                         onToggle = { activado ->
-                            modoSilencioso = activado
-                            prefs.modoSilencioso = activado
-                            sincronizarServicios()
+                            // Si activa y no tiene permiso de batería (optimización)
+                            if (activado && !bateria) {
+                                consentimientoActual = PermisoConsentimiento.Bateria
+                            } else {
+                                modoSilencioso = activado
+                                prefs.modoSilencioso = activado
+                                sincronizarServicios()
+                            }
                         }
                     )
                 }
