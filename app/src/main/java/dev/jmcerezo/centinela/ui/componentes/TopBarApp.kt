@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,7 +69,11 @@ import dev.jmcerezo.centinela.util.BiometricHelper
 import dev.jmcerezo.centinela.util.SystemUtils
 
 @Composable
-fun TopBarApp(onInfoClick: () -> Unit) {
+fun TopBarApp(
+    onInfoClick: () -> Unit,
+    permisoWidgetSolicitado: String? = null,
+    onPermisoWidgetMostrado: () -> Unit = {}
+) {
     val contexto = LocalContext.current
     val prefs = remember { Preferencias(contexto) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -106,6 +111,20 @@ fun TopBarApp(onInfoClick: () -> Unit) {
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     val locLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    // EFECTO: Capturar solicitud externa del Widget
+    LaunchedEffect(permisoWidgetSolicitado) {
+        if (permisoWidgetSolicitado != null) {
+            consentimientoActual = when (permisoWidgetSolicitado) {
+                "MICROFONO" -> PermisoConsentimiento.Microfono
+                "ACCESIBILIDAD" -> PermisoConsentimiento.Accesibilidad
+                "NOTIFICACIONES" -> PermisoConsentimiento.Notificaciones
+                "BATERIA" -> PermisoConsentimiento.Bateria
+                else -> null
+            }
+            onPermisoWidgetMostrado()
+        }
+    }
 
     val sincronizarServicios = {
         contexto.startService(Intent(contexto, CentinelaService::class.java))
