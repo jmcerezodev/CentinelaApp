@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
@@ -73,19 +72,16 @@ fun TopBarApp(
     var mostrarPanelSeguridad by remember { mutableStateOf(false) }
     var mostrarPanelAjustes by remember { mutableStateOf(false) }
     
-    // ESTADOS AJUSTES
     var servicioPermanente by remember { mutableStateOf(prefs.servicioPermanente) }
     var modoSilencioso by remember { mutableStateOf(prefs.modoSilencioso) }
     var botonesHabilitados by remember { mutableStateOf(prefs.botonesHabilitados) }
     var seguridadBiometrica by remember { mutableStateOf(prefs.seguridadBiometrica) }
 
-    // INFO DIALOGS (Informativos de Ajustes)
     var mostrarInfoPermanente by remember { mutableStateOf(false) }
     var mostrarInfoAntiSuspension by remember { mutableStateOf(false) }
     var mostrarInfoBotones by remember { mutableStateOf(false) }
     var mostrarInfoBiometria by remember { mutableStateOf(false) }
 
-    // ESTADOS DE PERMISOS
     var accesibilidad by remember { mutableStateOf(false) }
     var superposicion by remember { mutableStateOf(false) }
     var bateria by remember { mutableStateOf(false) }
@@ -96,7 +92,6 @@ fun TopBarApp(
     val todosLosPermisosOk = accesibilidad && superposicion && bateria && microfono && ubicacion && 
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificaciones else true)
 
-    // EFECTO: Capturar solicitud externa del Widget
     LaunchedEffect(permisoWidgetSolicitado) {
         if (permisoWidgetSolicitado != null) {
             val tipo = when (permisoWidgetSolicitado) {
@@ -135,10 +130,8 @@ fun TopBarApp(
         superposicion = Settings.canDrawOverlays(contexto)
         val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
         bateria = pm.isIgnoringBatteryOptimizations(contexto.packageName)
-        
         microfono = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         ubicacion = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificaciones = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         }
@@ -161,7 +154,6 @@ fun TopBarApp(
             Text(text = "CENTINELA", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
             Text(text = "SISTEMA DE PROTECCIÓN LEGAL", color = Color(0xFF3D5AFE), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
         }
-
         Row {
             IconButton(onClick = { mostrarPanelSeguridad = true }) {
                 Icon(
@@ -191,14 +183,35 @@ fun TopBarApp(
                 else {
                     (contexto as? FragmentActivity)?.let { activity ->
                         BiometricHelper.autenticar(activity, { 
-                            seguridadBiometrica = false; prefs.seguridadBiometrica = false
+                            seguridadBiometrica = false; prefs.seguridadBiometrica = false; sincronizarServicios()
                         }, { })
                     }
                 }
             },
-            onToggleBotones = { if (it) { if (!accesibilidad) onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad) else { botonesHabilitados = true; prefs.botonesHabilitados = true; sincronizarServicios() } } else { onSolicitarDesactivacion(PermisoConsentimiento.Accesibilidad) } },
-            onTogglePermanente = { if (it) { if (Build.VERSION.SDK_INT >= 33 && !notificaciones) onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones) else { servicioPermanente = true; prefs.servicioPermanente = true; sincronizarServicios() } } else { onSolicitarDesactivacion(PermisoConsentimiento.Notificaciones) } },
-            onToggleSilencioso = { if (it) { if (!bateria) onSolicitarConsentimiento(PermisoConsentimiento.Bateria) else { modoSilencioso = true; prefs.modoSilencioso = true; sincronizarServicios() } } else { onSolicitarDesactivacion(PermisoConsentimiento.Bateria) } },
+            onToggleBotones = { it ->
+                if (it) {
+                    if (!accesibilidad) onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad)
+                    else { botonesHabilitados = true; prefs.botonesHabilitados = true; sincronizarServicios() }
+                } else {
+                    botonesHabilitados = false; prefs.botonesHabilitados = false; sincronizarServicios()
+                }
+            },
+            onTogglePermanente = { it ->
+                if (it) {
+                    if (Build.VERSION.SDK_INT >= 33 && !notificaciones) onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones)
+                    else { servicioPermanente = true; prefs.servicioPermanente = true; sincronizarServicios() }
+                } else {
+                    servicioPermanente = false; prefs.servicioPermanente = false; sincronizarServicios()
+                }
+            },
+            onToggleSilencioso = { it ->
+                if (it) {
+                    if (!bateria) onSolicitarConsentimiento(PermisoConsentimiento.Bateria)
+                    else { modoSilencioso = true; prefs.modoSilencioso = true; sincronizarServicios() }
+                } else {
+                    modoSilencioso = false; prefs.modoSilencioso = false; sincronizarServicios()
+                }
+            },
             onInfoBiometria = { mostrarInfoBiometria = true },
             onInfoBotones = { mostrarInfoBotones = true },
             onInfoPermanente = { mostrarInfoPermanente = true },
@@ -221,14 +234,14 @@ fun TopBarApp(
         )
     }
 
-    // INFO DIALOGS
     if (mostrarInfoBiometria) {
         StructuredInfoDialog(
-            titulo = "Protección Huella",
+            titulo = "Protección Biométrica",
             secciones = listOf(
-                "Función" to "Exige autenticación mediante huella dactilar o rostro cada vez que se abre la aplicación.",
-                "Privacidad" to "Tus evidencias estarán seguras aunque prestes el móvil a otra persona.",
-                "Recomendación" to "Mantén esta opción activada para máxima seguridad."
+                "Función" to "Exige autenticación mediante huella dactilar o rostro cada vez que se abre la aplicación o se vuelve a ella desde segundo plano.",
+                "Privacidad" to "Tus evidencias estarán seguras aunque prestes el móvil a otra persona. Nadie podrá ver tus grabaciones sin tu consentimiento.",
+                "Gestión" to "Puedes activar o desactivar esta función en cualquier momento. Para desactivarla, se te pedirá confirmar tu identidad.",
+                "Permisos" to "Utiliza el hardware biométrico del dispositivo y la API Biometric de Android."
             ),
             onDismiss = { mostrarInfoBiometria = false }
         )
@@ -238,9 +251,10 @@ fun TopBarApp(
         StructuredInfoDialog(
             titulo = "Grabación con Botones",
             secciones = listOf(
-                "Función" to "Permite iniciar o detener la grabación pulsando 3 veces el botón de volumen arriba.",
-                "Recomendación" to "Desactívalo si vas a escuchar música.",
-                "Seguridad" to "Aunque esté desactivado, el botón REC de la pantalla siempre funcionará."
+                "Función" to "Permite iniciar o detener la grabación pulsando 3 veces el botón de volumen arriba de forma rápida.",
+                "Uso" to "Diseñado para situaciones de emergencia donde no puedes mirar la pantalla. Funciona incluso con el móvil bloqueado.",
+                "Permisos" to "Requiere el Servicio de Accesibilidad para detectar las pulsaciones físicas sin recopilar ningún otro dato.",
+                "Batería" to "Consumo insignificante. El sistema solo se activa al detectar el evento de volumen."
             ),
             onDismiss = { mostrarInfoBotones = false }
         )
@@ -250,8 +264,10 @@ fun TopBarApp(
         StructuredInfoDialog(
             titulo = "Servicio Permanente",
             secciones = listOf(
-                "Función" to "Mantiene la app en memoria para actuar siempre.",
-                "Batería" to "Consumo insignificante (0%)."
+                "Función" to "Mantiene un proceso ligero de Centinela siempre activo en la memoria del dispositivo.",
+                "Propósito" to "Garantiza que la detección de botones y el sistema de protección no sean cerrados por el gestor de memoria de Android.",
+                "Visibilidad" to "Muestra una pequeña notificación en la barra de estado indicando que la protección está activa.",
+                "Batería" to "Consumo mínimo (menos del 1%). No realiza procesos pesados en segundo plano."
             ),
             onDismiss = { mostrarInfoPermanente = false }
         )
@@ -261,9 +277,10 @@ fun TopBarApp(
         StructuredInfoDialog(
             titulo = "Modo Anti-Suspensión",
             secciones = listOf(
-                "Función" to "Fuerza la escucha con pantalla apagada.",
-                "Caso de Uso" to "Actívalo solo para grabaciones discretas.",
-                "Batería" to "Consumo moderado. Desactívalo al terminar."
+                "Función" to "Evita que Android entre en modo de bajo consumo (Doze) mientras se realiza una grabación.",
+                "Efecto" to "Asegura que la grabación no se corte a los pocos minutos de apagar la pantalla.",
+                "Técnica" to "Utiliza un 'WakeLock' y una sesión de audio silenciosa para mantener la CPU activa durante la captura.",
+                "Batería" to "Consumo moderado durante la grabación. Se recomienda desactivar si no se planean grabaciones largas con pantalla apagada."
             ),
             onDismiss = { mostrarInfoAntiSuspension = false }
         )
@@ -273,7 +290,7 @@ fun TopBarApp(
 @Composable
 fun PermisoRenglonAppBar(nombre: String, activado: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }.background(Color(0xFF25293D), RoundedCornerShape(8.dp)).padding(10.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {

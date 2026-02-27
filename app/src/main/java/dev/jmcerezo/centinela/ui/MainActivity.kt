@@ -61,7 +61,6 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
 
-        // Capturar permiso solicitado si la app se inicia desde el Widget
         permisoWidgetState.value = intent.getStringExtra("SOLICITAR_PERMISO")
 
         solicitudPermisosLauncher.launch(
@@ -90,7 +89,7 @@ class MainActivity : AppCompatActivity() {
                     mutableStateOf(!prefs.biometriaPreguntada && BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
 
-                // Sincronización con el Widget
+                // Sincronización reactiva con el Widget
                 val permisoDelWidget by permisoWidgetState
                 LaunchedEffect(permisoDelWidget, estaAutenticado) {
                     if (estaAutenticado && permisoDelWidget != null) {
@@ -214,6 +213,7 @@ class MainActivity : AppCompatActivity() {
                                 estaAutenticado = true
                                 mostrarSugerenciaBiometria = false
                                 contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
+                                Toast.makeText(contexto, "Seguridad activada", Toast.LENGTH_SHORT).show()
                             },
                             onDismiss = { 
                                 prefs.biometriaPreguntada = true
