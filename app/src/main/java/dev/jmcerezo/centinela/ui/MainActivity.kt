@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -60,6 +61,7 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
 
+        // Capturar permiso solicitado si la app se inicia desde el Widget
         permisoWidgetState.value = intent.getStringExtra("SOLICITAR_PERMISO")
 
         solicitudPermisosLauncher.launch(
@@ -83,6 +85,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 
                 var consentimientoDestacado by remember { mutableStateOf<PermisoConsentimiento?>(null) }
+                var consentimientoParaDesactivar by remember { mutableStateOf<PermisoConsentimiento?>(null) }
                 var mostrarSugerenciaBiometria by remember { 
                     mutableStateOf(!prefs.biometriaPreguntada && BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
@@ -102,7 +105,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // GESTIÓN DE CICLO DE VIDA (Seguridad)
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_START) {
@@ -140,7 +142,10 @@ class MainActivity : AppCompatActivity() {
                     ) {
                         TopBarApp(
                             onInfoClick = { mostrarInfoTecnica = true },
-                            onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo }
+                            permisoWidgetSolicitado = permisoDelWidget,
+                            onPermisoWidgetMostrado = { permisoWidgetState.value = null },
+                            onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo },
+                            onSolicitarDesactivacion = { tipo -> consentimientoParaDesactivar = tipo }
                         )
                         Box(modifier = Modifier.wrapContentHeight()) {
                             TarjetaGrabacion(gestorAudio = motor, alVerArchivos = { })
@@ -150,19 +155,18 @@ class MainActivity : AppCompatActivity() {
                         Box(modifier = Modifier.weight(1f)) {
                             ListaEvidencias(
                                 lista = listaGrabaciones,
-                                onPlay = { grabacion -> motor.reproducirAudio(grabacion) },
-                                onRename = { grabacion -> archivoParaRenombrar = grabacion },
-                                onShare = { grabacion -> motor.compartirArchivo(grabacion) },
-                                onDelete = { grabacion -> archivoParaEliminar = grabacion },
-                                onToggleFavorite = { grabacion -> viewModel.actualizar(grabacion.copy(esFavorito = !grabacion.esFavorito)) },
-                                onGeneratePDF = { grabacion -> PdfReportGenerator.generarYCompartir(contexto, grabacion) }
+                                onPlay = { grab -> motor.reproducirAudio(grab) },
+                                onRename = { grab -> archivoParaRenombrar = grab },
+                                onShare = { grab -> motor.compartirArchivo(grab) },
+                                onDelete = { grab -> archivoParaEliminar = grab },
+                                onToggleFavorite = { grab -> viewModel.actualizar(grab.copy(esFavorito = !grab.esFavorito)) },
+                                onGeneratePDF = { grab -> PdfReportGenerator.generarYCompartir(contexto, grab) }
                             )
                         }
                         FooterApp()
                     }
 
-                    // --- DIÁLOGOS CENTRALIZADOS ---
-                    
+                    // --- DIÁLOGOS DE ACTIVACIÓN (AVISO DESTACADO) ---
                     consentimientoDestacado?.let { consentimiento ->
                         val micL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
                         val locL = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
@@ -190,6 +194,18 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
 
+                    // --- DIÁLOGO DE DESACTIVACIÓN ---
+                    consentimientoParaDesactivar?.let { consentimiento ->
+                        DialogoDesactivarPermiso(
+                            consentimiento = consentimiento,
+                            onConfirm = {
+                                consentimientoParaDesactivar = null
+                                SystemUtils.abrirAjustesApp(contexto)
+                            },
+                            onDismiss = { consentimientoParaDesactivar = null }
+                        )
+                    }
+
                     if (mostrarSugerenciaBiometria) {
                         DialogoSugerenciaBiometria(
                             onConfirm = {
@@ -212,7 +228,7 @@ class MainActivity : AppCompatActivity() {
                         DialogoEliminar(nombreArchivo = grab.nombre, onConfirm = { motor.eliminarGrabacion(grab); archivoParaEliminar = null }, onDismiss = { archivoParaEliminar = null })
                     }
                     archivoParaRenombrar?.let { grab ->
-                        DialogoRenombrar(nombreActual = grab.nombre, onConfirm = { nuevo -> motor.renombrarGrabacion(grab, nuevo); archivoParaRenombrar = null }, onDismiss = { archivoParaRenombrar = null })
+                        DialogoRenombrar(nombreActual = grab.nombre, onConfirm = { nuevoNombre -> motor.renombrarGrabacion(grab, nuevoNombre); archivoParaRenombrar = null }, onDismiss = { archivoParaRenombrar = null })
                     }
                 } else {
                     Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0F111A)))

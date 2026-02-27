@@ -63,7 +63,8 @@ fun TopBarApp(
     onInfoClick: () -> Unit,
     permisoWidgetSolicitado: String? = null,
     onPermisoWidgetMostrado: () -> Unit = {},
-    onSolicitarConsentimiento: (PermisoConsentimiento) -> Unit
+    onSolicitarConsentimiento: (PermisoConsentimiento) -> Unit,
+    onSolicitarDesactivacion: (PermisoConsentimiento) -> Unit
 ) {
     val contexto = LocalContext.current
     val prefs = remember { Preferencias(contexto) }
@@ -115,7 +116,6 @@ fun TopBarApp(
         contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
     }
 
-    // SINCRONIZAR ESTADOS CON EL SISTEMA
     DisposableEffect(contexto) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -180,17 +180,25 @@ fun TopBarApp(
         }
     }
 
-    // PANEL DE CONFIGURACIÓN AVANZADA (COMPONENTES EXTRAÍDOS)
     if (mostrarPanelAjustes) {
         DialogoAjustesAvanzados(
             seguridadBiometrica = seguridadBiometrica,
             botonesHabilitados = botonesHabilitados,
             servicioPermanente = servicioPermanente,
             modoSilencioso = modoSilencioso,
-            onToggleBiometria = { if (it) onSolicitarConsentimiento(PermisoConsentimiento.Biometria) else { (contexto as? FragmentActivity)?.let { activity -> BiometricHelper.autenticar(activity, { seguridadBiometrica = false; prefs.seguridadBiometrica = false }, { }) } } },
-            onToggleBotones = { if (it && !accesibilidad) onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad) else { botonesHabilitados = it; prefs.botonesHabilitados = it; sincronizarServicios() } },
-            onTogglePermanente = { if (it && Build.VERSION.SDK_INT >= 33 && !notificaciones) onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones) else { servicioPermanente = it; prefs.servicioPermanente = it; sincronizarServicios() } },
-            onToggleSilencioso = { if (it && !bateria) onSolicitarConsentimiento(PermisoConsentimiento.Bateria) else { modoSilencioso = it; prefs.modoSilencioso = it; sincronizarServicios() } },
+            onToggleBiometria = { it ->
+                if (it) onSolicitarConsentimiento(PermisoConsentimiento.Biometria)
+                else {
+                    (contexto as? FragmentActivity)?.let { activity ->
+                        BiometricHelper.autenticar(activity, { 
+                            seguridadBiometrica = false; prefs.seguridadBiometrica = false
+                        }, { })
+                    }
+                }
+            },
+            onToggleBotones = { if (it) { if (!accesibilidad) onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad) else { botonesHabilitados = true; prefs.botonesHabilitados = true; sincronizarServicios() } } else { onSolicitarDesactivacion(PermisoConsentimiento.Accesibilidad) } },
+            onTogglePermanente = { if (it) { if (Build.VERSION.SDK_INT >= 33 && !notificaciones) onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones) else { servicioPermanente = true; prefs.servicioPermanente = true; sincronizarServicios() } } else { onSolicitarDesactivacion(PermisoConsentimiento.Notificaciones) } },
+            onToggleSilencioso = { if (it) { if (!bateria) onSolicitarConsentimiento(PermisoConsentimiento.Bateria) else { modoSilencioso = true; prefs.modoSilencioso = true; sincronizarServicios() } } else { onSolicitarDesactivacion(PermisoConsentimiento.Bateria) } },
             onInfoBiometria = { mostrarInfoBiometria = true },
             onInfoBotones = { mostrarInfoBotones = true },
             onInfoPermanente = { mostrarInfoPermanente = true },
@@ -199,22 +207,21 @@ fun TopBarApp(
         )
     }
 
-    // PANEL DE SEGURIDAD (COMPONENTES EXTRAÍDOS)
     if (mostrarPanelSeguridad) {
         DialogoEstadoSeguridad(
             microfonoOk = microfono, ubicacionOk = ubicacion, notificacionesOk = notificaciones,
             accesibilidadOk = accesibilidad, superposicionOk = superposicion, bateriaOk = bateria,
-            onClickMicrofono = { onSolicitarConsentimiento(PermisoConsentimiento.Microfono) },
-            onClickUbicacion = { onSolicitarConsentimiento(PermisoConsentimiento.Ubicacion) },
-            onClickNotificaciones = { onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones) },
-            onClickAccesibilidad = { onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad) },
-            onClickSuperposicion = { onSolicitarConsentimiento(PermisoConsentimiento.Superposicion) },
-            onClickBateria = { onSolicitarConsentimiento(PermisoConsentimiento.Bateria) },
+            onClickMicrofono = { if (microfono) onSolicitarDesactivacion(PermisoConsentimiento.Microfono) else onSolicitarConsentimiento(PermisoConsentimiento.Microfono) },
+            onClickUbicacion = { if (ubicacion) onSolicitarDesactivacion(PermisoConsentimiento.Ubicacion) else onSolicitarConsentimiento(PermisoConsentimiento.Ubicacion) },
+            onClickNotificaciones = { if (notificaciones) onSolicitarDesactivacion(PermisoConsentimiento.Notificaciones) else onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones) },
+            onClickAccesibilidad = { if (accesibilidad) onSolicitarDesactivacion(PermisoConsentimiento.Accesibilidad) else onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad) },
+            onClickSuperposicion = { if (superposicion) onSolicitarDesactivacion(PermisoConsentimiento.Superposicion) else onSolicitarConsentimiento(PermisoConsentimiento.Superposicion) },
+            onClickBateria = { if (bateria) onSolicitarDesactivacion(PermisoConsentimiento.Bateria) else onSolicitarConsentimiento(PermisoConsentimiento.Bateria) },
             onDismiss = { mostrarPanelSeguridad = false }
         )
     }
 
-    // DIÁLOGOS DE INFORMACIÓN
+    // INFO DIALOGS
     if (mostrarInfoBiometria) {
         StructuredInfoDialog(
             titulo = "Protección Huella",
