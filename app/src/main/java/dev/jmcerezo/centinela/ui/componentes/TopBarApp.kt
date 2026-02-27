@@ -1,18 +1,13 @@
 package dev.jmcerezo.centinela.ui.componentes
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +16,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,14 +27,9 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -56,7 +45,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
@@ -64,6 +52,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import dev.jmcerezo.centinela.core.service.CentinelaService
 import dev.jmcerezo.centinela.core.service.ServicioBotones
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
+import dev.jmcerezo.centinela.ui.componentes.dialogos.DialogoAjustesAvanzados
+import dev.jmcerezo.centinela.ui.componentes.dialogos.DialogoEstadoSeguridad
 import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 import dev.jmcerezo.centinela.util.BiometricHelper
 import dev.jmcerezo.centinela.util.SystemUtils
@@ -72,7 +62,8 @@ import dev.jmcerezo.centinela.util.SystemUtils
 fun TopBarApp(
     onInfoClick: () -> Unit,
     permisoWidgetSolicitado: String? = null,
-    onPermisoWidgetMostrado: () -> Unit = {}
+    onPermisoWidgetMostrado: () -> Unit = {},
+    onSolicitarConsentimiento: (PermisoConsentimiento) -> Unit
 ) {
     val contexto = LocalContext.current
     val prefs = remember { Preferencias(contexto) }
@@ -81,9 +72,6 @@ fun TopBarApp(
     var mostrarPanelSeguridad by remember { mutableStateOf(false) }
     var mostrarPanelAjustes by remember { mutableStateOf(false) }
     
-    // Estado para el Consentimiento Destacado (Requisito Google Play para permisos sensibles)
-    var consentimientoActual by remember { mutableStateOf<PermisoConsentimiento?>(null) }
-
     // ESTADOS AJUSTES
     var servicioPermanente by remember { mutableStateOf(prefs.servicioPermanente) }
     var modoSilencioso by remember { mutableStateOf(prefs.modoSilencioso) }
@@ -107,21 +95,17 @@ fun TopBarApp(
     val todosLosPermisosOk = accesibilidad && superposicion && bateria && microfono && ubicacion && 
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificaciones else true)
 
-    // Launchers para solicitud directa de permisos
-    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-    val locLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
-    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-
     // EFECTO: Capturar solicitud externa del Widget
     LaunchedEffect(permisoWidgetSolicitado) {
         if (permisoWidgetSolicitado != null) {
-            consentimientoActual = when (permisoWidgetSolicitado) {
+            val tipo = when (permisoWidgetSolicitado) {
                 "MICROFONO" -> PermisoConsentimiento.Microfono
                 "ACCESIBILIDAD" -> PermisoConsentimiento.Accesibilidad
                 "NOTIFICACIONES" -> PermisoConsentimiento.Notificaciones
                 "BATERIA" -> PermisoConsentimiento.Bateria
                 else -> null
             }
+            tipo?.let { onSolicitarConsentimiento(it) }
             onPermisoWidgetMostrado()
         }
     }
@@ -131,6 +115,7 @@ fun TopBarApp(
         contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
     }
 
+    // SINCRONIZAR ESTADOS CON EL SISTEMA
     DisposableEffect(contexto) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -151,11 +136,11 @@ fun TopBarApp(
         val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
         bateria = pm.isIgnoringBatteryOptimizations(contexto.packageName)
         
-        microfono = ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        ubicacion = ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        microfono = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        ubicacion = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificaciones = ContextCompat.checkSelfPermission(contexto, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            notificaciones = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         }
     }
 
@@ -168,9 +153,7 @@ fun TopBarApp(
     }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp, start = 20.dp, end = 8.dp, bottom = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, start = 20.dp, end = 8.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -188,250 +171,50 @@ fun TopBarApp(
                     modifier = Modifier.size(24.dp)
                 )
             }
-            
             IconButton(onClick = { mostrarPanelAjustes = true }) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Configuración Avanzada",
-                    tint = Color(0xFF3D5AFE),
-                    modifier = Modifier.size(24.dp)
-                )
+                Icon(imageVector = Icons.Default.Settings, contentDescription = "Configuración Avanzada", tint = Color(0xFF3D5AFE), modifier = Modifier.size(24.dp))
             }
-
             IconButton(onClick = onInfoClick) {
                 Icon(imageVector = Icons.Default.Info, contentDescription = "Información", tint = Color(0xFF3D5AFE), modifier = Modifier.size(24.dp))
             }
         }
     }
 
-    // PANEL DE CONFIGURACIÓN AVANZADA
+    // PANEL DE CONFIGURACIÓN AVANZADA (COMPONENTES EXTRAÍDOS)
     if (mostrarPanelAjustes) {
-        AlertDialog(
-            onDismissRequest = { mostrarPanelAjustes = false },
-            title = { Text("Configuración Avanzada", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AjusteInterruptorConInfo(
-                        titulo = "Protección Huella",
-                        subtitulo = "Pedir huella al abrir la app",
-                        activo = seguridadBiometrica,
-                        onInfo = { mostrarInfoBiometria = true },
-                        onToggle = { activado ->
-                            if (activado) {
-                                consentimientoActual = PermisoConsentimiento.Biometria
-                            } else {
-                                (contexto as? FragmentActivity)?.let { activity ->
-                                    BiometricHelper.autenticar(
-                                        actividad = activity,
-                                        onExito = {
-                                            seguridadBiometrica = false
-                                            prefs.seguridadBiometrica = false
-                                            Toast.makeText(contexto, "Seguridad desactivada", Toast.LENGTH_SHORT).show()
-                                        },
-                                        onError = {
-                                            Toast.makeText(contexto, "Autenticación necesaria para desactivar", Toast.LENGTH_SHORT).show()
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    )
-
-                    AjusteInterruptorConInfo(
-                        titulo = "Grabación con Botones",
-                        subtitulo = "Usa volumen arriba (x3) para grabar",
-                        activo = botonesHabilitados,
-                        onInfo = { mostrarInfoBotones = true },
-                        onToggle = { activado ->
-                            if (activado && !accesibilidad) {
-                                consentimientoActual = PermisoConsentimiento.Accesibilidad
-                            } else {
-                                botonesHabilitados = activado
-                                prefs.botonesHabilitados = activado
-                                sincronizarServicios()
-                            }
-                        }
-                    )
-
-                    AjusteInterruptorConInfo(
-                        titulo = "Servicio Permanente",
-                        subtitulo = "Evita el cierre automático",
-                        activo = servicioPermanente,
-                        onInfo = { mostrarInfoPermanente = true },
-                        onToggle = { activado ->
-                            if (activado && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificaciones) {
-                                consentimientoActual = PermisoConsentimiento.Notificaciones
-                            } else {
-                                servicioPermanente = activado
-                                prefs.servicioPermanente = activado
-                                sincronizarServicios()
-                            }
-                        }
-                    )
-
-                    AjusteInterruptorConInfo(
-                        titulo = "Modo Anti-Suspensión",
-                        subtitulo = "Escucha con pantalla apagada",
-                        activo = modoSilencioso,
-                        onInfo = { mostrarInfoAntiSuspension = true },
-                        onToggle = { activado ->
-                            if (activado && !bateria) {
-                                consentimientoActual = PermisoConsentimiento.Bateria
-                            } else {
-                                modoSilencioso = activado
-                                prefs.modoSilencioso = activado
-                                sincronizarServicios()
-                            }
-                        }
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = { mostrarPanelAjustes = false }) { Text("CERRAR", color = Color(0xFF3D5AFE)) } },
-            containerColor = Color(0xFF1A1D2E),
-            shape = RoundedCornerShape(24.dp)
+        DialogoAjustesAvanzados(
+            seguridadBiometrica = seguridadBiometrica,
+            botonesHabilitados = botonesHabilitados,
+            servicioPermanente = servicioPermanente,
+            modoSilencioso = modoSilencioso,
+            onToggleBiometria = { if (it) onSolicitarConsentimiento(PermisoConsentimiento.Biometria) else { (contexto as? FragmentActivity)?.let { activity -> BiometricHelper.autenticar(activity, { seguridadBiometrica = false; prefs.seguridadBiometrica = false }, { }) } } },
+            onToggleBotones = { if (it && !accesibilidad) onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad) else { botonesHabilitados = it; prefs.botonesHabilitados = it; sincronizarServicios() } },
+            onTogglePermanente = { if (it && Build.VERSION.SDK_INT >= 33 && !notificaciones) onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones) else { servicioPermanente = it; prefs.servicioPermanente = it; sincronizarServicios() } },
+            onToggleSilencioso = { if (it && !bateria) onSolicitarConsentimiento(PermisoConsentimiento.Bateria) else { modoSilencioso = it; prefs.modoSilencioso = it; sincronizarServicios() } },
+            onInfoBiometria = { mostrarInfoBiometria = true },
+            onInfoBotones = { mostrarInfoBotones = true },
+            onInfoPermanente = { mostrarInfoPermanente = true },
+            onInfoAntiSuspension = { mostrarInfoAntiSuspension = true },
+            onDismiss = { mostrarPanelAjustes = false }
         )
     }
 
-    // PANEL DE ESTADO DE SEGURIDAD (PERMISOS)
+    // PANEL DE SEGURIDAD (COMPONENTES EXTRAÍDOS)
     if (mostrarPanelSeguridad) {
-        AlertDialog(
-            onDismissRequest = { mostrarPanelSeguridad = false },
-            title = { Text("Estado de Seguridad", color = Color.White, fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Configura los permisos necesarios para el correcto funcionamiento del sistema.", color = Color.Gray, fontSize = 12.sp)
-                    
-                    PermisoRenglonAppBar("Micrófono", microfono) {
-                        consentimientoActual = PermisoConsentimiento.Microfono
-                    }
-
-                    PermisoRenglonAppBar("Ubicación (GPS)", ubicacion) {
-                        consentimientoActual = PermisoConsentimiento.Ubicacion
-                    }
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        PermisoRenglonAppBar("Notificaciones", notificaciones) {
-                            consentimientoActual = PermisoConsentimiento.Notificaciones
-                        }
-                    }
-
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
-
-                    PermisoRenglonAppBar("Accesibilidad", accesibilidad) {
-                        consentimientoActual = PermisoConsentimiento.Accesibilidad
-                    }
-                    
-                    PermisoRenglonAppBar("Aparecer encima", superposicion) {
-                        consentimientoActual = PermisoConsentimiento.Superposicion
-                    }
-                    
-                    PermisoRenglonAppBar("Gestión de Batería", bateria) {
-                        consentimientoActual = PermisoConsentimiento.Bateria
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { mostrarPanelSeguridad = false }) { Text("CERRAR", color = Color(0xFF3D5AFE)) } },
-            containerColor = Color(0xFF1A1D2E),
-            shape = RoundedCornerShape(24.dp)
+        DialogoEstadoSeguridad(
+            microfonoOk = microfono, ubicacionOk = ubicacion, notificacionesOk = notificaciones,
+            accesibilidadOk = accesibilidad, superposicionOk = superposicion, bateriaOk = bateria,
+            onClickMicrofono = { onSolicitarConsentimiento(PermisoConsentimiento.Microfono) },
+            onClickUbicacion = { onSolicitarConsentimiento(PermisoConsentimiento.Ubicacion) },
+            onClickNotificaciones = { onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones) },
+            onClickAccesibilidad = { onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad) },
+            onClickSuperposicion = { onSolicitarConsentimiento(PermisoConsentimiento.Superposicion) },
+            onClickBateria = { onSolicitarConsentimiento(PermisoConsentimiento.Bateria) },
+            onDismiss = { mostrarPanelSeguridad = false }
         )
     }
 
-    // DIÁLOGO DE CONSENTIMIENTO DESTACADO GENÉRICO (CUMPLE POLÍTICAS GOOGLE PLAY)
-    consentimientoActual?.let { consentimiento ->
-        AlertDialog(
-            onDismissRequest = { },
-            properties = DialogProperties(dismissOnClickOutside = false, dismissOnBackPress = true),
-            title = { 
-                Text(
-                    text = consentimiento.titulo, 
-                    color = Color.White, 
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                ) 
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = consentimiento.introduccion,
-                        color = Color.White,
-                        fontSize = 14.sp
-                    )
-                    
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0xFF3D5AFE).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-                        Column {
-                            Text(
-                                text = "Propósito de la función:",
-                                color = Color(0xFF3D5AFE),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = consentimiento.proposito,
-                                color = Color.LightGray,
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "Privacidad: Centinela NO recopila ni comparte sus datos personales con terceros. Esta información se utiliza exclusivamente para la funcionalidad descrita.",
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    
-                    Text(
-                        text = "¿Deseas conceder este permiso ahora?",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { consentimientoActual = null }) {
-                    Text("AHORA NO", color = Color.Gray)
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        val actual = consentimientoActual
-                        consentimientoActual = null
-                        when (actual) {
-                            PermisoConsentimiento.Accesibilidad -> contexto.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                            PermisoConsentimiento.Microfono -> micLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            PermisoConsentimiento.Ubicacion -> locLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-                            PermisoConsentimiento.Notificaciones -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            PermisoConsentimiento.Superposicion -> contexto.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${contexto.packageName}")))
-                            PermisoConsentimiento.Bateria -> contexto.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${contexto.packageName}")))
-                            PermisoConsentimiento.Biometria -> {
-                                seguridadBiometrica = true
-                                prefs.seguridadBiometrica = true
-                                prefs.biometriaPreguntada = true
-                                Toast.makeText(contexto, "Seguridad activada", Toast.LENGTH_SHORT).show()
-                            }
-                            null -> {}
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3D5AFE)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("SÍ, CONTINUAR", color = Color.White)
-                }
-            },
-            containerColor = Color(0xFF1A1D2E),
-            shape = RoundedCornerShape(28.dp)
-        )
-    }
-
-    // DIÁLOGOS DE INFORMACIÓN DE AJUSTES
+    // DIÁLOGOS DE INFORMACIÓN
     if (mostrarInfoBiometria) {
         StructuredInfoDialog(
             titulo = "Protección Huella",
@@ -497,39 +280,11 @@ fun PermisoRenglonAppBar(nombre: String, activado: Boolean, onClick: () -> Unit)
 }
 
 sealed class PermisoConsentimiento(val titulo: String, val introduccion: String, val proposito: String) {
-    object Accesibilidad : PermisoConsentimiento(
-        "Servicio de Accesibilidad",
-        "Centinela requiere la API de Accesibilidad para funcionar en segundo plano.",
-        "Detectar pulsaciones de los botones físicos de volumen para iniciar o detener grabaciones de emergencia sin necesidad de encender la pantalla."
-    )
-    object Microfono : PermisoConsentimiento(
-        "Permiso de Micrófono",
-        "El acceso al micrófono es esencial para la funcionalidad principal de la app.",
-        "Capturar y grabar audio de alta fidelidad para generar evidencias legales válidas."
-    )
-    object Ubicacion : PermisoConsentimiento(
-        "Permiso de Ubicación",
-        "La ubicación añade una capa de validez legal a tus grabaciones.",
-        "Certificar el lugar exacto (coordenadas GPS y dirección) donde se realizó la grabación de la evidencia."
-    )
-    object Notificaciones : PermisoConsentimiento(
-        "Permiso de Notificaciones",
-        "Necesario para mantener el sistema de protección activo.",
-        "Mostrar una notificación permanente que evita que el sistema Android cierre la aplicación y garantiza que la grabación no se interrumpa."
-    )
-    object Superposicion : PermisoConsentimiento(
-        "Aparecer encima",
-        "Permite que el proceso de grabación tenga prioridad visual.",
-        "Garantizar que la grabación no sea interrumpida por otras aplicaciones o por el bloqueo automático del sistema."
-    )
-    object Bateria : PermisoConsentimiento(
-        "Gestión de Batería",
-        "Evita la suspensión automática por ahorro de energía.",
-        "Asegurar que Centinela esté siempre listo para actuar, impidiendo que Android cierre el servicio de seguridad para ahorrar batería."
-    )
-    object Biometria : PermisoConsentimiento(
-        "Seguridad Biométrica",
-        "Protege el acceso a tus grabaciones mediante la seguridad de tu dispositivo.",
-        "Solicitar tu huella dactilar o reconocimiento facial cada vez que se abra la aplicación para garantizar que solo tú puedas ver las evidencias. Puedes cambiar esta opción en cualquier momento desde estos ajustes."
-    )
+    object Accesibilidad : PermisoConsentimiento("Servicio de Accesibilidad", "Centinela requiere la API de Accesibilidad para funcionar en segundo plano.", "Detectar pulsaciones de los botones físicos de volumen para iniciar o detener grabaciones de emergencia sin necesidad de encender la pantalla.")
+    object Microfono : PermisoConsentimiento("Permiso de Micrófono", "El acceso al micrófono es esencial para la funcionalidad principal de la app.", "Capturar y grabar audio de alta fidelidad para generar evidencias legales válidas.")
+    object Ubicacion : PermisoConsentimiento("Permiso de Ubicación", "La ubicación añade una capa de validez legal a tus grabaciones.", "Certificar el lugar exacto (coordenadas GPS y dirección) donde se realizó la grabación de la evidencia.")
+    object Notificaciones : PermisoConsentimiento("Permiso de Notificaciones", "Necesario para mantener el sistema de protección activo.", "Mostrar una notificación permanente que evita que el sistema Android cierre la aplicación y garantiza que la grabación no se interrumpa.")
+    object Superposicion : PermisoConsentimiento("Aparecer encima", "Permite que el proceso de grabación tenga prioridad visual.", "Garantizar que la grabación no sea interrumpida por otras aplicaciones o por el bloqueo automático del sistema.")
+    object Bateria : PermisoConsentimiento("Gestión de Batería", "Evita la suspensión automática por ahorro de energía.", "Asegurar que Centinela esté siempre listo para actuar, impidiendo que Android cierre el servicio de seguridad para ahorrar batería.")
+    object Biometria : PermisoConsentimiento("Seguridad Biométrica", "Protege el acceso a tus grabaciones mediante la seguridad de tu dispositivo.", "Solicitar tu huella dactilar o reconocimiento facial cada vez que se abra la aplicación para garantizar que solo tú puedas ver las evidencias. Puedes cambiar esta opción en cualquier momento desde estos ajustes.")
 }

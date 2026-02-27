@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 
@@ -15,10 +16,6 @@ object SystemUtils {
 
     /**
      * Comprueba si un servicio de accesibilidad específico está activado en los ajustes del sistema.
-     * 
-     * @param context Contexto de la aplicación.
-     * @param service Clase del servicio que se desea comprobar.
-     * @return True si el servicio está habilitado y activo.
      */
     fun isAccessibilityServiceEnabled(context: Context, service: Class<out AccessibilityService>): Boolean {
         val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
@@ -31,11 +28,42 @@ object SystemUtils {
 
     /**
      * Abre la pantalla de información de la aplicación en los ajustes del sistema.
-     * Útil para que el usuario gestione permisos de forma manual.
      */
     fun abrirAjustesApp(context: Context) {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    /**
+     * Abre los ajustes de accesibilidad.
+     */
+    fun abrirAjustesAccesibilidad(context: Context) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    /**
+     * Abre los ajustes de superposición sobre otras apps.
+     */
+    fun abrirAjustesSuperposicion(context: Context) {
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+            data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    /**
+     * Abre los ajustes de optimización de batería.
+     */
+    fun abrirAjustesBateria(context: Context) {
+        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
     }

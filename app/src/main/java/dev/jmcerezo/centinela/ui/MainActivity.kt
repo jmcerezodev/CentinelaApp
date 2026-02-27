@@ -7,22 +7,20 @@ import android.graphics.Color
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,15 +32,15 @@ import dev.jmcerezo.centinela.ui.componentes.dialogos.*
 import dev.jmcerezo.centinela.ui.theme.CentinelaTheme
 import dev.jmcerezo.centinela.util.BiometricHelper
 import dev.jmcerezo.centinela.util.PdfReportGenerator
+import dev.jmcerezo.centinela.util.SystemUtils
 
 /**
  * Actividad principal de la aplicación Centinela.
- * Gestiona la autenticación biométrica obligatoria y las solicitudes de permisos desde el Widget.
+ * Gestiona la autenticación biométrica y la visualización de avisos destacados de permisos.
  */
 class MainActivity : AppCompatActivity() {
 
-    // Estado para capturar solicitudes de permisos externas (Widget)
-    private var permisoPendientePorWidget: String? = null
+    private val permisoWidgetState = mutableStateOf<String?>(null)
 
     private val solicitudPermisosLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -50,7 +48,7 @@ class MainActivity : AppCompatActivity() {
         val microConcedido = resultados[Manifest.permission.RECORD_AUDIO] ?: false
         val gpsConcedido = resultados[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
         if (!microConcedido || !gpsConcedido) {
-            Toast.makeText(this@MainActivity, "Se requieren permisos de micro y GPS", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Se requieren permisos de micro y GPS", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -62,8 +60,7 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
 
-        // Capturamos si venimos del widget solicitando un permiso
-        permisoPendientePorWidget = intent.getStringExtra("SOLICITAR_PERMISO")
+        permisoWidgetState.value = intent.getStringExtra("SOLICITAR_PERMISO")
 
         solicitudPermisosLauncher.launch(
             arrayOf(
@@ -85,13 +82,27 @@ class MainActivity : AppCompatActivity() {
                     mutableStateOf(!prefs.seguridadBiometrica || !BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
                 
+                var consentimientoDestacado by remember { mutableStateOf<PermisoConsentimiento?>(null) }
                 var mostrarSugerenciaBiometria by remember { 
                     mutableStateOf(!prefs.biometriaPreguntada && BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
 
-                // NUEVO: Estado para mostrar el diálogo de permiso solicitado desde el Widget
-                var permisoWidgetActual by remember { mutableStateOf(permisoPendientePorWidget) }
+                // Sincronización con el Widget
+                val permisoDelWidget by permisoWidgetState
+                LaunchedEffect(permisoDelWidget, estaAutenticado) {
+                    if (estaAutenticado && permisoDelWidget != null) {
+                        consentimientoDestacado = when (permisoDelWidget) {
+                            "MICROFONO" -> PermisoConsentimiento.Microfono
+                            "ACCESIBILIDAD" -> PermisoConsentimiento.Accesibilidad
+                            "NOTIFICACIONES" -> PermisoConsentimiento.Notificaciones
+                            "BATERIA" -> PermisoConsentimiento.Bateria
+                            else -> null
+                        }
+                        permisoWidgetState.value = null
+                    }
+                }
 
+                // GESTIÓN DE CICLO DE VIDA (Seguridad)
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_START) {
@@ -100,7 +111,6 @@ class MainActivity : AppCompatActivity() {
                                     actividad = this@MainActivity,
                                     onExito = { estaAutenticado = true },
                                     onError = { error ->
-                                        Toast.makeText(this@MainActivity, "Acceso denegado", Toast.LENGTH_LONG).show()
                                         if (error.contains("cancel", true) || error.contains("atrás", true)) finish()
                                     }
                                 )
@@ -121,14 +131,6 @@ class MainActivity : AppCompatActivity() {
                     var archivoParaEliminar by remember { mutableStateOf<GrabacionDato?>(null) }
                     var archivoParaRenombrar by remember { mutableStateOf<GrabacionDato?>(null) }
 
-                    // Si venimos del widget, forzamos la apertura del panel de seguridad o ajustes
-                    LaunchedEffect(permisoWidgetActual) {
-                        if (permisoWidgetActual != null) {
-                            // Al detectar que venimos del widget, mostramos el panel de seguridad
-                            // TopBarApp ya gestionará el diálogo destacado según el estado de los permisos.
-                        }
-                    }
-
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -138,8 +140,7 @@ class MainActivity : AppCompatActivity() {
                     ) {
                         TopBarApp(
                             onInfoClick = { mostrarInfoTecnica = true },
-                            permisoWidgetSolicitado = permisoWidgetActual,
-                            onPermisoWidgetMostrado = { permisoWidgetActual = null }
+                            onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo }
                         )
                         Box(modifier = Modifier.wrapContentHeight()) {
                             TarjetaGrabacion(gestorAudio = motor, alVerArchivos = { })
@@ -160,52 +161,58 @@ class MainActivity : AppCompatActivity() {
                         FooterApp()
                     }
 
-                    if (mostrarSugerenciaBiometria) {
-                        AlertDialog(
-                            onDismissRequest = { },
-                            properties = DialogProperties(dismissOnClickOutside = false, dismissOnBackPress = true),
-                            title = { Text("Reforzar Seguridad", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                            text = { 
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Text("Para proteger tus evidencias legales, Centinela puede solicitar tu huella dactilar o reconocimiento facial cada vez que abras la aplicación.", color = androidx.compose.ui.graphics.Color.White, fontSize = 14.sp)
-                                    Box(modifier = Modifier.background(androidx.compose.ui.graphics.Color(0xFF3D5AFE).copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(12.dp)) {
-                                        Text("Esto garantiza que solo tú puedas acceder a los archivos grabados, incluso si alguien más utiliza tu dispositivo.", color = androidx.compose.ui.graphics.Color.LightGray, fontSize = 13.sp, lineHeight = 18.sp)
+                    // --- DIÁLOGOS CENTRALIZADOS ---
+                    
+                    consentimientoDestacado?.let { consentimiento ->
+                        val micL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+                        val locL = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+                        val notifL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+                        DialogoConsentimientoDestacado(
+                            consentimiento = consentimiento,
+                            onConfirm = {
+                                consentimientoDestacado = null
+                                when (consentimiento) {
+                                    PermisoConsentimiento.Accesibilidad -> SystemUtils.abrirAjustesAccesibilidad(contexto)
+                                    PermisoConsentimiento.Microfono -> micL.launch(Manifest.permission.RECORD_AUDIO)
+                                    PermisoConsentimiento.Ubicacion -> locL.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                                    PermisoConsentimiento.Notificaciones -> if (android.os.Build.VERSION.SDK_INT >= 33) notifL.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    PermisoConsentimiento.Superposicion -> SystemUtils.abrirAjustesSuperposicion(contexto)
+                                    PermisoConsentimiento.Bateria -> SystemUtils.abrirAjustesBateria(contexto)
+                                    PermisoConsentimiento.Biometria -> {
+                                        prefs.seguridadBiometrica = true
+                                        prefs.biometriaPreguntada = true
+                                        contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
                                     }
-                                    Text("Nota: Puedes cambiar esta configuración en cualquier momento desde los Ajustes Avanzados de la aplicación.", color = androidx.compose.ui.graphics.Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 }
                             },
-                            confirmButton = {
-                                Button(onClick = {
-                                    prefs.seguridadBiometrica = true
-                                    prefs.biometriaPreguntada = true
-                                    estaAutenticado = true
-                                    mostrarSugerenciaBiometria = false
-                                    contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
-                                    Toast.makeText(contexto, "Seguridad activada", Toast.LENGTH_SHORT).show()
-                                }, colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF3D5AFE)), shape = RoundedCornerShape(12.dp)) {
-                                    Text("ACTIVAR PROTECCIÓN", color = androidx.compose.ui.graphics.Color.White)
-                                }
+                            onDismiss = { consentimientoDestacado = null }
+                        )
+                    }
+
+                    if (mostrarSugerenciaBiometria) {
+                        DialogoSugerenciaBiometria(
+                            onConfirm = {
+                                prefs.seguridadBiometrica = true
+                                prefs.biometriaPreguntada = true
+                                estaAutenticado = true
+                                mostrarSugerenciaBiometria = false
+                                contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
                             },
-                            dismissButton = {
-                                TextButton(onClick = { 
-                                    prefs.biometriaPreguntada = true
-                                    mostrarSugerenciaBiometria = false 
-                                    contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
-                                }) {
-                                    Text("MANTENER DESACTIVADA", color = androidx.compose.ui.graphics.Color.Gray)
-                                }
-                            },
-                            containerColor = androidx.compose.ui.graphics.Color(0xFF1A1D2E),
-                            shape = RoundedCornerShape(28.dp)
+                            onDismiss = { 
+                                prefs.biometriaPreguntada = true
+                                mostrarSugerenciaBiometria = false 
+                                contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
+                            }
                         )
                     }
 
                     if (mostrarInfoTecnica) DialogoInfoTecnica(onDismiss = { mostrarInfoTecnica = false })
-                    archivoParaEliminar?.let { grabacion ->
-                        DialogoEliminar(nombreArchivo = grabacion.nombre, onConfirm = { motor.eliminarGrabacion(grabacion); archivoParaEliminar = null }, onDismiss = { archivoParaEliminar = null })
+                    archivoParaEliminar?.let { grab ->
+                        DialogoEliminar(nombreArchivo = grab.nombre, onConfirm = { motor.eliminarGrabacion(grab); archivoParaEliminar = null }, onDismiss = { archivoParaEliminar = null })
                     }
-                    archivoParaRenombrar?.let { grabacion ->
-                        DialogoRenombrar(nombreActual = grabacion.nombre, onConfirm = { nuevoNombre -> motor.renombrarGrabacion(grabacion, nuevoNombre); archivoParaRenombrar = null }, onDismiss = { archivoParaRenombrar = null })
+                    archivoParaRenombrar?.let { grab ->
+                        DialogoRenombrar(nombreActual = grab.nombre, onConfirm = { nuevo -> motor.renombrarGrabacion(grab, nuevo); archivoParaRenombrar = null }, onDismiss = { archivoParaRenombrar = null })
                     }
                 } else {
                     Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0F111A)))
@@ -216,11 +223,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        // También capturamos si la app ya estaba abierta y se pulsa el widget
+        setIntent(intent)
         val permiso = intent.getStringExtra("SOLICITAR_PERMISO")
         if (permiso != null) {
-            permisoPendientePorWidget = permiso
-            // Esto disparará la recomposición en setContent si usamos un estado observable
+            permisoWidgetState.value = permiso
         }
     }
 }
