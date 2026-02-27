@@ -2,6 +2,7 @@ package dev.jmcerezo.centinela.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.widget.Toast
@@ -17,10 +18,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
 import dev.jmcerezo.centinela.data.local.db.GrabacionDato
@@ -33,7 +37,7 @@ import dev.jmcerezo.centinela.util.PdfReportGenerator
 
 /**
  * Actividad principal de la aplicación Centinela.
- * Gestiona la autenticación biométrica opcional y la solicitud de permisos críticos.
+ * Gestiona la autenticación biométrica obligatoria al entrar en primer plano.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -69,8 +73,8 @@ class MainActivity : AppCompatActivity() {
                 val prefs = remember { Preferencias(contexto) }
                 val motor = remember { GrabadoraMotor.getInstance(contexto) }
                 val viewModel: GrabacionViewModel = viewModel()
+                val lifecycleOwner = LocalLifecycleOwner.current
 
-                // Si la biometría está desactivada en ajustes, entramos directamente
                 var estaAutenticado by remember { 
                     mutableStateOf(!prefs.seguridadBiometrica || !BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
@@ -79,17 +83,27 @@ class MainActivity : AppCompatActivity() {
                     mutableStateOf(!prefs.biometriaPreguntada && BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
 
-                LaunchedEffect(Unit) {
-                    if (prefs.seguridadBiometrica && BiometricHelper.esBiometriaDisponible(contexto)) {
-                        BiometricHelper.autenticar(
-                            actividad = this@MainActivity,
-                            onExito = { estaAutenticado = true },
-                            onError = { error ->
-                                Toast.makeText(this@MainActivity, "Acceso denegado", Toast.LENGTH_LONG).show()
-                                if (error.contains("cancel", true)) finish()
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_START) {
+                            if (prefs.seguridadBiometrica && BiometricHelper.esBiometriaDisponible(contexto)) {
+                                BiometricHelper.autenticar(
+                                    actividad = this@MainActivity,
+                                    onExito = { estaAutenticado = true },
+                                    onError = { error ->
+                                        Toast.makeText(this@MainActivity, "Acceso denegado", Toast.LENGTH_LONG).show()
+                                        if (error.contains("cancel", true) || error.contains("atrás", true)) finish()
+                                    }
+                                )
+                            } else {
+                                estaAutenticado = true
                             }
-                        )
+                        } else if (event == Lifecycle.Event.ON_STOP) {
+                            if (prefs.seguridadBiometrica) estaAutenticado = false
+                        }
                     }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
                 if (estaAutenticado) {
@@ -129,54 +143,26 @@ class MainActivity : AppCompatActivity() {
                         AlertDialog(
                             onDismissRequest = { },
                             properties = DialogProperties(dismissOnClickOutside = false, dismissOnBackPress = true),
-                            title = { 
-                                Text(
-                                    text = "Reforzar Seguridad", 
-                                    color = androidx.compose.ui.graphics.Color.White, 
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
-                                ) 
-                            },
+                            title = { Text("Reforzar Seguridad", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
                             text = { 
                                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Text(
-                                        text = "Para proteger tus evidencias legales, Centinela puede solicitar tu huella dactilar o reconocimiento facial cada vez que abras la aplicación.",
-                                        color = androidx.compose.ui.graphics.Color.White,
-                                        fontSize = 14.sp
-                                    )
-                                    
-                                    Box(
-                                        modifier = Modifier
-                                            .background(androidx.compose.ui.graphics.Color(0xFF3D5AFE).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                                            .padding(12.dp)
-                                    ) {
-                                        Text(
-                                            text = "Esto garantiza que solo tú puedas acceder a los archivos grabados, incluso si alguien más utiliza tu dispositivo.",
-                                            color = androidx.compose.ui.graphics.Color.LightGray,
-                                            fontSize = 13.sp,
-                                            lineHeight = 18.sp
-                                        )
+                                    Text("Para proteger tus evidencias legales, Centinela puede solicitar tu huella dactilar o reconocimiento facial cada vez que abras la aplicación.", color = androidx.compose.ui.graphics.Color.White, fontSize = 14.sp)
+                                    Box(modifier = Modifier.background(androidx.compose.ui.graphics.Color(0xFF3D5AFE).copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(12.dp)) {
+                                        Text("Esto garantiza que solo tú puedas acceder a los archivos grabados, incluso si alguien más utiliza tu dispositivo.", color = androidx.compose.ui.graphics.Color.LightGray, fontSize = 13.sp, lineHeight = 18.sp)
                                     }
-
-                                    Text(
-                                        text = "Nota: Puedes cambiar esta configuración en cualquier momento desde los Ajustes Avanzados de la aplicación.",
-                                        color = androidx.compose.ui.graphics.Color.Gray,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
-                                    )
+                                    Text("Nota: Puedes cambiar esta configuración en cualquier momento desde los Ajustes Avanzados de la aplicación.", color = androidx.compose.ui.graphics.Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                 }
                             },
                             confirmButton = {
-                                Button(
-                                    onClick = {
-                                        prefs.seguridadBiometrica = true
-                                        prefs.biometriaPreguntada = true
-                                        mostrarSugerenciaBiometria = false
-                                        Toast.makeText(contexto, "Seguridad activada", Toast.LENGTH_SHORT).show()
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF3D5AFE)),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
+                                Button(onClick = {
+                                    prefs.seguridadBiometrica = true
+                                    prefs.biometriaPreguntada = true
+                                    estaAutenticado = true
+                                    mostrarSugerenciaBiometria = false
+                                    // Sincronizamos con el panel de ajustes avanzados
+                                    contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
+                                    Toast.makeText(contexto, "Seguridad activada", Toast.LENGTH_SHORT).show()
+                                }, colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF3D5AFE)), shape = RoundedCornerShape(12.dp)) {
                                     Text("ACTIVAR PROTECCIÓN", color = androidx.compose.ui.graphics.Color.White)
                                 }
                             },
@@ -184,6 +170,8 @@ class MainActivity : AppCompatActivity() {
                                 TextButton(onClick = { 
                                     prefs.biometriaPreguntada = true
                                     mostrarSugerenciaBiometria = false 
+                                    // Sincronizamos aunque no acepte para guardar biometriaPreguntada
+                                    contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
                                 }) {
                                     Text("MANTENER DESACTIVADA", color = androidx.compose.ui.graphics.Color.Gray)
                                 }
@@ -195,18 +183,10 @@ class MainActivity : AppCompatActivity() {
 
                     if (mostrarInfoTecnica) DialogoInfoTecnica(onDismiss = { mostrarInfoTecnica = false })
                     archivoParaEliminar?.let { grabacion ->
-                        DialogoEliminar(
-                            nombreArchivo = grabacion.nombre,
-                            onConfirm = { motor.eliminarGrabacion(grabacion); archivoParaEliminar = null },
-                            onDismiss = { archivoParaEliminar = null }
-                        )
+                        DialogoEliminar(nombreArchivo = grabacion.nombre, onConfirm = { motor.eliminarGrabacion(grabacion); archivoParaEliminar = null }, onDismiss = { archivoParaEliminar = null })
                     }
                     archivoParaRenombrar?.let { grabacion ->
-                        DialogoRenombrar(
-                            nombreActual = grabacion.nombre,
-                            onConfirm = { nuevoNombre -> motor.renombrarGrabacion(grabacion, nuevoNombre); archivoParaRenombrar = null },
-                            onDismiss = { archivoParaRenombrar = null }
-                        )
+                        DialogoRenombrar(nombreActual = grabacion.nombre, onConfirm = { nuevoNombre -> motor.renombrarGrabacion(grabacion, nuevoNombre); archivoParaRenombrar = null }, onDismiss = { archivoParaRenombrar = null })
                     }
                 } else {
                     Box(modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color(0xFF0F111A)))
