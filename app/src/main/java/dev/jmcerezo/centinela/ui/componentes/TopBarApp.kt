@@ -31,7 +31,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,11 +56,13 @@ import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 import dev.jmcerezo.centinela.util.BiometricHelper
 import dev.jmcerezo.centinela.util.SystemUtils
 
+/**
+ * Barra superior de la aplicación.
+ * Gestiona el acceso a los paneles de Seguridad y Ajustes.
+ */
 @Composable
 fun TopBarApp(
     onInfoClick: () -> Unit,
-    permisoWidgetSolicitado: String? = null,
-    onPermisoWidgetMostrado: () -> Unit = {},
     onSolicitarConsentimiento: (PermisoConsentimiento) -> Unit,
     onSolicitarDesactivacion: (PermisoConsentimiento) -> Unit
 ) {
@@ -91,20 +92,6 @@ fun TopBarApp(
 
     val todosLosPermisosOk = accesibilidad && superposicion && bateria && microfono && ubicacion && 
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificaciones else true)
-
-    LaunchedEffect(permisoWidgetSolicitado) {
-        if (permisoWidgetSolicitado != null) {
-            val tipo = when (permisoWidgetSolicitado) {
-                "MICROFONO" -> PermisoConsentimiento.Microfono
-                "ACCESIBILIDAD" -> PermisoConsentimiento.Accesibilidad
-                "NOTIFICACIONES" -> PermisoConsentimiento.Notificaciones
-                "BATERIA" -> PermisoConsentimiento.Bateria
-                else -> null
-            }
-            tipo?.let { onSolicitarConsentimiento(it) }
-            onPermisoWidgetMostrado()
-        }
-    }
 
     val sincronizarServicios = {
         contexto.startService(Intent(contexto, CentinelaService::class.java))

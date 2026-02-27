@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -41,6 +40,7 @@ import dev.jmcerezo.centinela.util.SystemUtils
  */
 class MainActivity : AppCompatActivity() {
 
+    // Estado persistente para la solicitud del Widget
     private val permisoWidgetState = mutableStateOf<String?>(null)
 
     private val solicitudPermisosLauncher = registerForActivityResult(
@@ -61,15 +61,8 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
 
+        // Capturamos el permiso inicial si la app arranca desde el Widget
         permisoWidgetState.value = intent.getStringExtra("SOLICITAR_PERMISO")
-
-        solicitudPermisosLauncher.launch(
-            arrayOf(
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
 
         setContent {
             CentinelaTheme {
@@ -79,20 +72,25 @@ class MainActivity : AppCompatActivity() {
                 val viewModel: GrabacionViewModel = viewModel()
                 val lifecycleOwner = LocalLifecycleOwner.current
 
+                // Estado de autenticación
                 var estaAutenticado by remember { 
                     mutableStateOf(!prefs.seguridadBiometrica || !BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
                 
+                // Estados de Diálogos
                 var consentimientoDestacado by remember { mutableStateOf<PermisoConsentimiento?>(null) }
                 var consentimientoParaDesactivar by remember { mutableStateOf<PermisoConsentimiento?>(null) }
                 var mostrarSugerenciaBiometria by remember { 
                     mutableStateOf(!prefs.biometriaPreguntada && BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
 
-                // Sincronización reactiva con el Widget
+                // --- LÓGICA DE SINCRONIZACIÓN DEL WIDGET ---
+                // Solo disparamos el diálogo del Widget si:
+                // 1. El usuario está autenticado (ha pasado la huella si era necesaria)
+                // 2. NO se está mostrando la sugerencia de biometría inicial (para no solapar modales)
                 val permisoDelWidget by permisoWidgetState
-                LaunchedEffect(permisoDelWidget, estaAutenticado) {
-                    if (estaAutenticado && permisoDelWidget != null) {
+                LaunchedEffect(permisoDelWidget, estaAutenticado, mostrarSugerenciaBiometria) {
+                    if (estaAutenticado && !mostrarSugerenciaBiometria && permisoDelWidget != null) {
                         consentimientoDestacado = when (permisoDelWidget) {
                             "MICROFONO" -> PermisoConsentimiento.Microfono
                             "ACCESIBILIDAD" -> PermisoConsentimiento.Accesibilidad
@@ -100,10 +98,11 @@ class MainActivity : AppCompatActivity() {
                             "BATERIA" -> PermisoConsentimiento.Bateria
                             else -> null
                         }
-                        permisoWidgetState.value = null
+                        permisoWidgetState.value = null // Limpiamos la señal tras procesarla
                     }
                 }
 
+                // GESTIÓN DE SEGURIDAD (Ciclo de Vida)
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_START) {
@@ -141,8 +140,6 @@ class MainActivity : AppCompatActivity() {
                     ) {
                         TopBarApp(
                             onInfoClick = { mostrarInfoTecnica = true },
-                            permisoWidgetSolicitado = permisoDelWidget,
-                            onPermisoWidgetMostrado = { permisoWidgetState.value = null },
                             onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo },
                             onSolicitarDesactivacion = { tipo -> consentimientoParaDesactivar = tipo }
                         )
@@ -165,7 +162,8 @@ class MainActivity : AppCompatActivity() {
                         FooterApp()
                     }
 
-                    // --- DIÁLOGOS DE ACTIVACIÓN (AVISO DESTACADO) ---
+                    // --- DIÁLOGOS CENTRALIZADOS ---
+                    
                     consentimientoDestacado?.let { consentimiento ->
                         val micL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
                         val locL = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
@@ -193,7 +191,6 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
 
-                    // --- DIÁLOGO DE DESACTIVACIÓN ---
                     consentimientoParaDesactivar?.let { consentimiento ->
                         DialogoDesactivarPermiso(
                             consentimiento = consentimiento,
@@ -213,7 +210,6 @@ class MainActivity : AppCompatActivity() {
                                 estaAutenticado = true
                                 mostrarSugerenciaBiometria = false
                                 contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
-                                Toast.makeText(contexto, "Seguridad activada", Toast.LENGTH_SHORT).show()
                             },
                             onDismiss = { 
                                 prefs.biometriaPreguntada = true
