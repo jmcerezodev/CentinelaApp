@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -56,12 +57,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.jmcerezo.centinela.core.service.CentinelaService
 import dev.jmcerezo.centinela.core.service.ServicioBotones
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
+import dev.jmcerezo.centinela.util.BiometricHelper
 import dev.jmcerezo.centinela.util.SystemUtils
 
 @Composable
@@ -195,8 +198,23 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                         activo = seguridadBiometrica,
                         onInfo = { mostrarInfoBiometria = true },
                         onToggle = { activado ->
-                            seguridadBiometrica = activado
-                            prefs.seguridadBiometrica = activado
+                            if (activado) {
+                                consentimientoActual = PermisoConsentimiento.Biometria
+                            } else {
+                                (contexto as? FragmentActivity)?.let { activity ->
+                                    BiometricHelper.autenticar(
+                                        actividad = activity,
+                                        onExito = {
+                                            seguridadBiometrica = false
+                                            prefs.seguridadBiometrica = false
+                                            Toast.makeText(contexto, "Seguridad desactivada", Toast.LENGTH_SHORT).show()
+                                        },
+                                        onError = {
+                                            Toast.makeText(contexto, "Autenticación necesaria para desactivar", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            }
                         }
                     )
 
@@ -222,7 +240,6 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                         activo = servicioPermanente,
                         onInfo = { mostrarInfoPermanente = true },
                         onToggle = { activado ->
-                            // Si activa y no tiene permiso de notificaciones (en Android 13+)
                             if (activado && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificaciones) {
                                 consentimientoActual = PermisoConsentimiento.Notificaciones
                             } else {
@@ -239,7 +256,6 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                         activo = modoSilencioso,
                         onInfo = { mostrarInfoAntiSuspension = true },
                         onToggle = { activado ->
-                            // Si activa y no tiene permiso de batería (optimización)
                             if (activado && !bateria) {
                                 consentimientoActual = PermisoConsentimiento.Bateria
                             } else {
@@ -376,7 +392,13 @@ fun TopBarApp(onInfoClick: () -> Unit) {
                             PermisoConsentimiento.Notificaciones -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             PermisoConsentimiento.Superposicion -> contexto.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${contexto.packageName}")))
                             PermisoConsentimiento.Bateria -> contexto.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${contexto.packageName}")))
-                            else -> {}
+                            PermisoConsentimiento.Biometria -> {
+                                seguridadBiometrica = true
+                                prefs.seguridadBiometrica = true
+                                prefs.biometriaPreguntada = true
+                                Toast.makeText(contexto, "Seguridad activada", Toast.LENGTH_SHORT).show()
+                            }
+                            null -> {}
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3D5AFE)),
@@ -485,5 +507,10 @@ sealed class PermisoConsentimiento(val titulo: String, val introduccion: String,
         "Gestión de Batería",
         "Evita la suspensión automática por ahorro de energía.",
         "Asegurar que Centinela esté siempre listo para actuar, impidiendo que Android cierre el servicio de seguridad para ahorrar batería."
+    )
+    object Biometria : PermisoConsentimiento(
+        "Seguridad Biométrica",
+        "Protege el acceso a tus grabaciones mediante la seguridad de tu dispositivo.",
+        "Solicitar tu huella dactilar o reconocimiento facial cada vez que se abra la aplicación para garantizar que solo tú puedas ver las evidencias. Puedes cambiar esta opción en cualquier momento desde estos ajustes."
     )
 }

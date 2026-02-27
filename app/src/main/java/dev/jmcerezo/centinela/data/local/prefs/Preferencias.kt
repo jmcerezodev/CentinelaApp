@@ -34,8 +34,16 @@ class Preferencias(context: Context) {
 
     /**
      * Determina si la seguridad biométrica está habilitada al abrir la aplicación.
+     * Ajustado: Ahora desactivado por defecto.
      */
     var seguridadBiometrica: Boolean
-        get() = prefs.getBoolean("seguridad_biometrica", true)
+        get() = prefs.getBoolean("seguridad_biometrica", false)
         set(value) = prefs.edit().putBoolean("seguridad_biometrica", value).apply()
+
+    /**
+     * Indica si ya se le ha preguntado al usuario sobre la biometría.
+     */
+    var biometriaPreguntada: Boolean
+        get() = prefs.getBoolean("biometria_preguntada", false)
+        set(value) = prefs.edit().putBoolean("biometria_preguntada", value).apply()
 }
