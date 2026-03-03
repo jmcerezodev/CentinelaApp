@@ -74,15 +74,32 @@ class AudioRecorderManager(private val contexto: Context) {
      * Lógica de compartición de archivos mediante FileProvider.
      */
     fun compartir(grabacion: GrabacionDato) {
-        val file = File(grabacion.rutaArchivo)
-        if (!file.exists()) return
-        
-        val uri = FileProvider.getUriForFile(contexto, "${contexto.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "audio/mp4"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            val file = File(grabacion.rutaArchivo)
+            if (!file.exists()) {
+                Log.e("Centinela", "El archivo de audio no existe en la ruta: ${grabacion.rutaArchivo}")
+                return
+            }
+            
+            // Usamos el ID del paquete dinámico para mayor compatibilidad
+            val authority = "${contexto.packageName}.fileprovider"
+            val uri = FileProvider.getUriForFile(contexto, authority, file)
+            
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "audio/mp4"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                // Es vital otorgar permisos de lectura a la aplicación receptora
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            
+            // Crear el Chooser asegurando que el Intent resultante sea una Activity nueva si se lanza desde un contexto de aplicación
+            val chooserIntent = Intent.createChooser(intent, "Compartir evidencia...")
+            chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            
+            contexto.startActivity(chooserIntent)
+        } catch (e: Exception) {
+            Log.e("Centinela", "Error fatal al intentar compartir: ${e.message}")
+            e.printStackTrace()
         }
-        contexto.startActivity(Intent.createChooser(intent, "Compartir evidencia..."))
     }
 }
