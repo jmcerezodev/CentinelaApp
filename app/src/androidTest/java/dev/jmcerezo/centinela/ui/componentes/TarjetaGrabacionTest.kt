@@ -18,44 +18,50 @@ class TarjetaGrabacionTest {
     val composeTestRule = createComposeRule()
 
     private lateinit var motor: GrabadoraMotor
+    private val contexto = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Before
     fun setup() {
-        val contexto = ApplicationProvider.getApplicationContext<android.content.Context>()
         motor = GrabadoraMotor.getInstance(contexto)
-        
-        // 1. Conceder permisos para que el botón REC pueda iniciar el motor sin diálogos del sistema
-        val packageName = contexto.packageName
-        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("pm grant $packageName ${Manifest.permission.RECORD_AUDIO}")
-        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("pm grant $packageName ${Manifest.permission.ACCESS_FINE_LOCATION}")
-
-        // 2. Limpieza total del Singleton
         motor.resetEstadoInterno()
-        Thread.sleep(500)
+        
+        // Otorgamos permisos de forma estable al inicio
+        val packageName = contexto.packageName
+        val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        uiAutomation.executeShellCommand("pm grant $packageName ${Manifest.permission.RECORD_AUDIO}")
+        uiAutomation.executeShellCommand("pm grant $packageName ${Manifest.permission.ACCESS_FINE_LOCATION}")
+        
+        // Pausa generosa para que el S23 procese los permisos
+        Thread.sleep(1500)
     }
 
     @Test
     fun testCambioDeEstadoAlPulsarRec() {
         composeTestRule.setContent {
-            TarjetaGrabacion(gestorAudio = motor, alVerArchivos = {})
+            TarjetaGrabacion(
+                gestorAudio = motor, 
+                alVerArchivos = {}, 
+                onSolicitarConsentimiento = {}
+            )
         }
 
-        // Verificar estado inicial
+        // 1. Verificar estado inicial
         composeTestRule.onNodeWithText("REC").assertIsDisplayed()
 
-        // Acción
+        // 2. Iniciar grabación
         composeTestRule.onNodeWithText("REC").performClick()
 
-        // Espera asíncrona robusta al cambio de estado visual
-        composeTestRule.waitUntil(5000) {
+        // 3. Esperar a que el motor cambie el estado visual a STOP
+        composeTestRule.waitUntil(8000) {
             try {
                 composeTestRule.onNodeWithText("STOP").assertIsDisplayed()
                 true
-            } catch (e: AssertionError) {
+            } catch (e: Exception) {
                 false
             }
         }
         
+        // Limpieza
         motor.resetEstadoInterno()
     }
 }

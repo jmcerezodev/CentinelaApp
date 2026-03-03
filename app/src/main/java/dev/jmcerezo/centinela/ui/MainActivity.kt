@@ -164,7 +164,11 @@ class MainActivity : AppCompatActivity() {
                             onSolicitarDesactivacion = { tipo -> consentimientoParaDesactivar = tipo }
                         )
                         Box(modifier = Modifier.wrapContentHeight()) {
-                            TarjetaGrabacion(gestorAudio = motor, alVerArchivos = { })
+                            TarjetaGrabacion(
+                                gestorAudio = motor, 
+                                alVerArchivos = { },
+                                onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo }
+                            )
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         TopBarHistorial()

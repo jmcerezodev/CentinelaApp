@@ -1,9 +1,11 @@
 package dev.jmcerezo.centinela.ui.componentes
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -25,7 +27,11 @@ import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
  * Sincronizado globalmente mediante broadcasts para responder a pulsaciones físicas.
  */
 @Composable
-fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
+fun TarjetaGrabacion(
+    gestorAudio: GrabadoraMotor, 
+    alVerArchivos: () -> Unit,
+    onSolicitarConsentimiento: (PermisoConsentimiento) -> Unit
+) {
     val contexto = LocalContext.current
     var grabando by remember { mutableStateOf(gestorAudio.estaGrabando) }
 
@@ -90,10 +96,27 @@ fun TarjetaGrabacion(gestorAudio: GrabadoraMotor, alVerArchivos: () -> Unit) {
                         onClick = {
                             if (grabando) {
                                 gestorAudio.detenerGrabacion()
-                                // No cambiamos 'grabando' aquí manualmente, 
-                                // el broadcast lo hará por nosotros para asegurar sincronía total.
                             } else {
-                                gestorAudio.iniciarGrabacion()
+                                // Verificar si tenemos permisos de micrófono Y ubicación antes de iniciar
+                                val tieneMicro = ContextCompat.checkSelfPermission(
+                                    contexto, 
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+                                
+                                val tieneGPS = ContextCompat.checkSelfPermission(
+                                    contexto, 
+                                    Manifest.permission.ACCESS_FINE_LOCATION
+                                ) == PackageManager.PERMISSION_GRANTED
+
+                                if (tieneMicro && tieneGPS) {
+                                    gestorAudio.iniciarGrabacion()
+                                } else if (!tieneMicro) {
+                                    // Priorizamos el micro, que dispara el diálogo conjunto
+                                    onSolicitarConsentimiento(PermisoConsentimiento.Microfono)
+                                } else {
+                                    // Si tiene micro pero no GPS
+                                    onSolicitarConsentimiento(PermisoConsentimiento.Ubicacion)
+                                }
                             }
                         },
                         modifier = Modifier
