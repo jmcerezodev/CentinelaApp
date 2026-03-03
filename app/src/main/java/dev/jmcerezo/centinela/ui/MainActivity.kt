@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
                                     // Bloqueamos la miniatura preventivamente hasta que se autentique
                                     window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                                     BiometricHelper.autenticar(
-                                        actividad = this@MainActivity,
+                                        contexto = contexto,
                                         onExito = { 
                                             estaAutenticado = true
                                             window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -216,7 +216,12 @@ class MainActivity : AppCompatActivity() {
                             consentimiento = consentimiento,
                             onConfirm = {
                                 consentimientoParaDesactivar = null
-                                SystemUtils.abrirAjustesApp(contexto)
+                                when (consentimiento) {
+                                    PermisoConsentimiento.Accesibilidad -> SystemUtils.abrirAjustesAccesibilidad(contexto)
+                                    PermisoConsentimiento.Superposicion -> SystemUtils.abrirAjustesSuperposicion(contexto)
+                                    PermisoConsentimiento.Bateria -> SystemUtils.abrirAjustesBateria(contexto)
+                                    else -> SystemUtils.abrirAjustesApp(contexto)
+                                }
                             },
                             onDismiss = { consentimientoParaDesactivar = null }
                         )

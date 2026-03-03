@@ -1,5 +1,6 @@
 package dev.jmcerezo.centinela.ui.componentes
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -10,15 +11,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -29,12 +22,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,7 +32,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.jmcerezo.centinela.core.service.CentinelaService
@@ -56,10 +43,6 @@ import dev.jmcerezo.centinela.ui.componentes.dialogos.StructuredInfoDialog
 import dev.jmcerezo.centinela.util.BiometricHelper
 import dev.jmcerezo.centinela.util.SystemUtils
 
-/**
- * Barra superior de la aplicación.
- * Gestiona el acceso a los paneles de Seguridad y Ajustes.
- */
 @Composable
 fun TopBarApp(
     onInfoClick: () -> Unit,
@@ -94,7 +77,8 @@ fun TopBarApp(
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificaciones else true)
 
     val sincronizarServicios = {
-        contexto.startService(Intent(contexto, CentinelaService::class.java))
+        val intent = Intent(contexto, CentinelaService::class.java)
+        ContextCompat.startForegroundService(contexto, intent)
         contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
     }
 
@@ -117,10 +101,12 @@ fun TopBarApp(
         superposicion = Settings.canDrawOverlays(contexto)
         val pm = contexto.getSystemService(Context.POWER_SERVICE) as PowerManager
         bateria = pm.isIgnoringBatteryOptimizations(contexto.packageName)
-        microfono = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        ubicacion = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        microfono = ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        ubicacion = ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificaciones = ContextCompat.checkSelfPermission(contexto, android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            notificaciones = ContextCompat.checkSelfPermission(contexto, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else {
+            notificaciones = true
         }
     }
 
@@ -168,35 +154,26 @@ fun TopBarApp(
             onToggleBiometria = { it ->
                 if (it) onSolicitarConsentimiento(PermisoConsentimiento.Biometria)
                 else {
-                    (contexto as? FragmentActivity)?.let { activity ->
-                        BiometricHelper.autenticar(activity, { 
-                            seguridadBiometrica = false; prefs.seguridadBiometrica = false; sincronizarServicios()
-                        }, { })
-                    }
+                    BiometricHelper.autenticar(
+                        contexto = contexto,
+                        titulo = "Desactivar Seguridad",
+                        onExito = { 
+                            seguridadBiometrica = false
+                            prefs.seguridadBiometrica = false
+                            sincronizarServicios()
+                        },
+                        onError = { }
+                    )
                 }
             },
             onToggleBotones = { it ->
-                if (it) {
-                    if (!accesibilidad) onSolicitarConsentimiento(PermisoConsentimiento.Accesibilidad)
-                    else { botonesHabilitados = true; prefs.botonesHabilitados = true; sincronizarServicios() }
-                } else {
-                    botonesHabilitados = false; prefs.botonesHabilitados = false; sincronizarServicios()
-                }
+                botonesHabilitados = it; prefs.botonesHabilitados = it; sincronizarServicios()
             },
             onTogglePermanente = { it ->
-                if (it) {
-                    servicioPermanente = true; prefs.servicioPermanente = true; sincronizarServicios()
-                } else {
-                    servicioPermanente = false; prefs.servicioPermanente = false; sincronizarServicios()
-                }
+                servicioPermanente = it; prefs.servicioPermanente = it; sincronizarServicios()
             },
             onToggleSilencioso = { it ->
-                if (it) {
-                    if (!bateria) onSolicitarConsentimiento(PermisoConsentimiento.Bateria)
-                    else { modoSilencioso = true; prefs.modoSilencioso = true; sincronizarServicios() }
-                } else {
-                    modoSilencioso = false; prefs.modoSilencioso = false; sincronizarServicios()
-                }
+                modoSilencioso = it; prefs.modoSilencioso = it; sincronizarServicios()
             },
             onInfoBiometria = { mostrarInfoBiometria = true },
             onInfoBotones = { mostrarInfoBotones = true },

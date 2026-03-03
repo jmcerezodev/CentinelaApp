@@ -1,13 +1,15 @@
 package dev.jmcerezo.centinela.util
 
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import androidx.core.content.ContextCompat
+import android.util.Log
 
 /**
- * Gestor de autenticación biométrica (Huella, Rostro, PIN).
+ * Gestor de autenticación biométrica profesional.
  */
 object BiometricHelper {
 
@@ -22,19 +24,40 @@ object BiometricHelper {
     }
 
     /**
-     * Lanza el diálogo de autenticación del sistema.
+     * Busca la FragmentActivity recorriendo los ContextWrappers.
+     * Vital para evitar crashes en Compose al usar BiometricPrompt.
+     */
+    fun obtenerActividad(contexto: Context): FragmentActivity? {
+        var context = contexto
+        while (context is ContextWrapper) {
+            if (context is FragmentActivity) return context
+            context = context.baseContext
+        }
+        return null
+    }
+
+    /**
+     * Lanza el diálogo de autenticación de forma segura.
      */
     fun autenticar(
-        actividad: FragmentActivity,
+        contexto: Context,
+        titulo: String = "Confirmar Identidad",
         onExito: () -> Unit,
         onError: (String) -> Unit
     ) {
+        val actividad = obtenerActividad(contexto)
+        if (actividad == null) {
+            Log.e("BiometricHelper", "No se pudo encontrar la FragmentActivity")
+            onError("Error de sistema: Actividad no encontrada")
+            return
+        }
+
         val executor = ContextCompat.getMainExecutor(actividad)
-        
         val biometricPrompt = BiometricPrompt(actividad, executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
+                    Log.d("BiometricHelper", "Error/Cancelado: $errString")
                     onError(errString.toString())
                 }
 
@@ -50,11 +73,16 @@ object BiometricHelper {
             })
 
         val infoPrompt = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Acceso a Centinela")
-            .setSubtitle("Autentícate para ver tus evidencias")
+            .setTitle(titulo)
+            .setSubtitle("Se requiere autenticación para continuar")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
             .build()
 
-        biometricPrompt.authenticate(infoPrompt)
+        try {
+            biometricPrompt.authenticate(infoPrompt)
+        } catch (e: Exception) {
+            Log.e("BiometricHelper", "Error al iniciar BiometricPrompt: ${e.message}")
+            onError("Error al iniciar autenticación")
+        }
     }
 }

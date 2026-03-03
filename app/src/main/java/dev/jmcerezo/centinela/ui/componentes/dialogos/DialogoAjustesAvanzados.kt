@@ -14,8 +14,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import dev.jmcerezo.centinela.core.service.ServicioBotones
 import dev.jmcerezo.centinela.ui.componentes.AjusteInterruptorConInfo
 import dev.jmcerezo.centinela.ui.componentes.PermisoConsentimiento
+import dev.jmcerezo.centinela.util.SystemUtils
 
 @Composable
 fun DialogoAjustesAvanzados(
@@ -36,17 +38,19 @@ fun DialogoAjustesAvanzados(
 ) {
     val contexto = LocalContext.current
     
-    // Verificamos el permiso de micro de forma reactiva
-    val tienePermisoMicro = ContextCompat.checkSelfPermission(
-        contexto, 
-        Manifest.permission.RECORD_AUDIO
-    ) == PackageManager.PERMISSION_GRANTED
+    // Verificación de todos los permisos necesarios de forma dinámica
+    val tieneMicro = ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    val tieneAccesibilidad = SystemUtils.isAccessibilityServiceEnabled(contexto, ServicioBotones::class.java)
+    val tieneNotif = if (android.os.Build.VERSION.SDK_INT >= 33) {
+        ContextCompat.checkSelfPermission(contexto, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    } else true
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Configuración Avanzada", color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // 1. BIOMETRÍA (Independiente)
                 AjusteInterruptorConInfo(
                     titulo = "Protección Huella",
                     subtitulo = "Pedir huella al abrir la app",
@@ -55,39 +59,57 @@ fun DialogoAjustesAvanzados(
                     onToggle = onToggleBiometria
                 )
 
+                // 2. GRABACIÓN CON BOTONES (Requiere Micro y Accesibilidad)
+                val okBotones = tieneMicro && tieneAccesibilidad
                 AjusteInterruptorConInfo(
                     titulo = "Grabación con Botones",
-                    subtitulo = if (tienePermisoMicro) "Usa volumen arriba (x3) para grabar" else "Requiere permiso de micrófono",
+                    subtitulo = if (okBotones) "Usa volumen arriba (x3) para grabar" else buildString {
+                        if (!tieneMicro) append("Requiere permiso de Microfono")
+                        if (!tieneAccesibilidad) { if (isNotEmpty()) append("\n"); append("Requiere permiso de Accesibilidad") }
+                    },
                     activo = botonesHabilitados,
-                    habilitado = tienePermisoMicro,
+                    habilitado = okBotones,
                     onInfo = onInfoBotones,
                     onToggle = { 
-                        if (tienePermisoMicro) onToggleBotones(it) 
-                        else onRequerirConsentimiento(PermisoConsentimiento.Microfono) 
+                        if (okBotones) onToggleBotones(it) 
+                        else if (!tieneMicro) onRequerirConsentimiento(PermisoConsentimiento.Microfono)
+                        else onRequerirConsentimiento(PermisoConsentimiento.Accesibilidad)
                     }
                 )
 
+                // 3. SERVICIO PERMANENTE (Requiere Micro y Notificaciones)
+                val okPermanente = tieneMicro && tieneNotif
                 AjusteInterruptorConInfo(
                     titulo = "Servicio Permanente",
-                    subtitulo = if (tienePermisoMicro) "Evita el cierre automático" else "Requiere permiso de micrófono",
+                    subtitulo = if (okPermanente) "Evita el cierre automático" else buildString {
+                        if (!tieneMicro) append("Requiere permiso de Microfono")
+                        if (!tieneNotif) { if (isNotEmpty()) append("\n"); append("Requiere permiso de Notificaciones") }
+                    },
                     activo = servicioPermanente,
-                    habilitado = tienePermisoMicro,
+                    habilitado = okPermanente,
                     onInfo = onInfoPermanente,
                     onToggle = { 
-                        if (tienePermisoMicro) onTogglePermanente(it) 
-                        else onRequerirConsentimiento(PermisoConsentimiento.Microfono) 
+                        if (okPermanente) onTogglePermanente(it) 
+                        else if (!tieneMicro) onRequerirConsentimiento(PermisoConsentimiento.Microfono)
+                        else onRequerirConsentimiento(PermisoConsentimiento.Notificaciones)
                     }
                 )
 
+                // 4. MODO ANTI-SUSPENSIÓN (Requiere Micro y Notificaciones)
+                val okAnti = tieneMicro && tieneNotif
                 AjusteInterruptorConInfo(
                     titulo = "Modo Anti-Suspensión",
-                    subtitulo = if (tienePermisoMicro) "Escucha con pantalla apagada" else "Requiere permiso de micrófono",
+                    subtitulo = if (okAnti) "Escucha con pantalla apagada" else buildString {
+                        if (!tieneMicro) append("Requiere permiso de Microfono")
+                        if (!tieneNotif) { if (isNotEmpty()) append("\n"); append("Requiere permiso de Notificaciones") }
+                    },
                     activo = modoSilencioso,
-                    habilitado = tienePermisoMicro,
+                    habilitado = okAnti,
                     onInfo = onInfoAntiSuspension,
                     onToggle = { 
-                        if (tienePermisoMicro) onToggleSilencioso(it) 
-                        else onRequerirConsentimiento(PermisoConsentimiento.Microfono) 
+                        if (okAnti) onToggleSilencioso(it) 
+                        else if (!tieneMicro) onRequerirConsentimiento(PermisoConsentimiento.Microfono)
+                        else onRequerirConsentimiento(PermisoConsentimiento.Notificaciones)
                     }
                 )
             }
