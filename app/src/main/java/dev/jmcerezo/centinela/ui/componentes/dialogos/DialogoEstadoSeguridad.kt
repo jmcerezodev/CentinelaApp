@@ -27,6 +27,7 @@ fun DialogoEstadoSeguridad(
     bateriaOk: Boolean,
     onClickMicrofono: () -> Unit,
     onClickUbicacion: () -> Unit,
+    notifOk: Boolean = true, // Mantener compatibilidad si es necesario
     onClickNotificaciones: () -> Unit,
     onClickAccesibilidad: () -> Unit,
     onClickSuperposicion: () -> Unit,
@@ -35,10 +36,10 @@ fun DialogoEstadoSeguridad(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Estado de Seguridad", color = Color.White, fontWeight = FontWeight.Bold) },
+        title = { Text("ESTADO DE PERMISOS", color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Configura los permisos necesarios para el correcto funcionamiento del sistema.", color = Color.Gray, fontSize = 12.sp)
+                Text("Configura los permisos necesarios para el correcto funcionamiento de la grabadora.", color = Color.Gray, fontSize = 12.sp)
                 
                 PermisoRenglonAppBar("Micrófono", microfonoOk, onClickMicrofono)
                 PermisoRenglonAppBar("Ubicación (GPS)", ubicacionOk, onClickUbicacion)
