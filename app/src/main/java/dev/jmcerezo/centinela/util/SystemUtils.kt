@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
@@ -32,6 +33,32 @@ object SystemUtils {
     fun abrirAjustesApp(context: Context) {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
             data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    /**
+     * Intenta abrir directamente la pantalla de permisos de la aplicación.
+     */
+    fun abrirPermisosApp(context: Context) {
+        try {
+            val intent = Intent("android.intent.action.MANAGE_APP_PERMISSIONS").apply {
+                putExtra("android.intent.extra.PACKAGE_NAME", context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            abrirAjustesApp(context)
+        }
+    }
+
+    /**
+     * Abre directamente los ajustes de notificaciones de la aplicación.
+     */
+    fun abrirAjustesNotificaciones(context: Context) {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)

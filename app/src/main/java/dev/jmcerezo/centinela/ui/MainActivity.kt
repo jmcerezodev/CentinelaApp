@@ -3,6 +3,7 @@ package dev.jmcerezo.centinela.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.view.WindowManager
@@ -22,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -41,18 +43,8 @@ import dev.jmcerezo.centinela.util.SystemUtils
  */
 class MainActivity : AppCompatActivity() {
 
-    // Estado persistente para la solicitud del Widget
+    // Estado reactivo para capturar solicitudes externas del Widget incluso con la app abierta
     private val permisoWidgetState = mutableStateOf<String?>(null)
-
-    private val solicitudPermisosLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { resultados ->
-        val microConcedido = resultados[Manifest.permission.RECORD_AUDIO] ?: false
-        val gpsConcedido = resultados[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        if (!microConcedido || !gpsConcedido) {
-            Toast.makeText(this, "Se requieren permisos de micro y GPS", Toast.LENGTH_LONG).show()
-        }
-    }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,7 +54,7 @@ class MainActivity : AppCompatActivity() {
         )
         super.onCreate(savedInstanceState)
 
-        // Capturamos el permiso inicial si la app arranca desde el Widget
+        // Capturamos el permiso solicitado si la app se inicia desde el Widget
         permisoWidgetState.value = intent.getStringExtra("SOLICITAR_PERMISO")
 
         setContent {
@@ -85,6 +77,26 @@ class MainActivity : AppCompatActivity() {
                     mutableStateOf(!prefs.biometriaPreguntada && BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
 
+                // Lanzadores de permisos
+                val micL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
+                    if (concedido) {
+                        // Al conceder micro, comprobamos si falta GPS para seguir la secuencia
+                        if (ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                            consentimientoDestacado = PermisoConsentimiento.Ubicacion
+                        }
+                    } else {
+                        Toast.makeText(contexto, "Se requiere permiso de micro", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                val gpsL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
+                    if (!concedido) {
+                        Toast.makeText(contexto, "Se requiere permiso de GPS para evidencias legales", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                val notifL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
                 // --- LÓGICA DE SINCRONIZACIÓN DEL WIDGET ---
                 val permisoDelWidget by permisoWidgetState
                 LaunchedEffect(permisoDelWidget, estaAutenticado, mostrarSugerenciaBiometria) {
@@ -106,7 +118,6 @@ class MainActivity : AppCompatActivity() {
                         when (event) {
                             Lifecycle.Event.ON_START -> {
                                 if (prefs.seguridadBiometrica && BiometricHelper.esBiometriaDisponible(contexto)) {
-                                    // Bloqueamos la miniatura preventivamente hasta que se autentique
                                     window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                                     BiometricHelper.autenticar(
                                         contexto = contexto,
@@ -124,13 +135,11 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                             Lifecycle.Event.ON_PAUSE -> {
-                                // Al pausar, si la seguridad está activa, ocultamos la preview de recientes
                                 if (prefs.seguridadBiometrica) {
                                     window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                                 }
                             }
                             Lifecycle.Event.ON_RESUME -> {
-                                // Al volver al primer plano, si ya estamos autenticados, mostramos el contenido
                                 if (estaAutenticado) {
                                     window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                                 }
@@ -187,12 +196,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     // --- DIÁLOGOS CENTRALIZADOS ---
-                    
                     consentimientoDestacado?.let { consentimiento ->
-                        val micL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-                        val locL = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
-                        val notifL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-
                         DialogoConsentimientoDestacado(
                             consentimiento = consentimiento,
                             onConfirm = {
@@ -200,7 +204,7 @@ class MainActivity : AppCompatActivity() {
                                 when (consentimiento) {
                                     PermisoConsentimiento.Accesibilidad -> SystemUtils.abrirAjustesAccesibilidad(contexto)
                                     PermisoConsentimiento.Microfono -> micL.launch(Manifest.permission.RECORD_AUDIO)
-                                    PermisoConsentimiento.Ubicacion -> locL.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                                    PermisoConsentimiento.Ubicacion -> gpsL.launch(Manifest.permission.ACCESS_FINE_LOCATION)
                                     PermisoConsentimiento.Notificaciones -> if (android.os.Build.VERSION.SDK_INT >= 33) notifL.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     PermisoConsentimiento.Superposicion -> SystemUtils.abrirAjustesSuperposicion(contexto)
                                     PermisoConsentimiento.Bateria -> SystemUtils.abrirAjustesBateria(contexto)
@@ -224,6 +228,8 @@ class MainActivity : AppCompatActivity() {
                                     PermisoConsentimiento.Accesibilidad -> SystemUtils.abrirAjustesAccesibilidad(contexto)
                                     PermisoConsentimiento.Superposicion -> SystemUtils.abrirAjustesSuperposicion(contexto)
                                     PermisoConsentimiento.Bateria -> SystemUtils.abrirAjustesBateria(contexto)
+                                    PermisoConsentimiento.Notificaciones -> SystemUtils.abrirAjustesNotificaciones(contexto)
+                                    PermisoConsentimiento.Ubicacion, PermisoConsentimiento.Microfono -> SystemUtils.abrirPermisosApp(contexto)
                                     else -> SystemUtils.abrirAjustesApp(contexto)
                                 }
                             },

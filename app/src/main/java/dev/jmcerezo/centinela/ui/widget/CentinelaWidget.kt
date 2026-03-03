@@ -59,17 +59,30 @@ class ToggleAction : ActionCallback {
         val prefsApp = Preferencias(context)
         val motor = GrabadoraMotor.getInstance(context)
 
-        // Verificamos qué permiso falta
+        // 1. Verificación universal del micrófono (Requerido por todos los botones)
+        val tieneMicro = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        
+        // 2. Determinación del permiso faltante según la lógica solicitada
         val permisoFaltante = when (accion) {
-            "grabar" -> if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) "MICROFONO" else null
-            "botones" -> if (!SystemUtils.isAccessibilityServiceEnabled(context, ServicioBotones::class.java)) "ACCESIBILIDAD" else null
-            "permanente" -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) "NOTIFICACIONES" else null
-            "suspension" -> if (!(context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager).isIgnoringBatteryOptimizations(context.packageName)) "BATERIA" else null
+            "grabar" -> if (!tieneMicro) "MICROFONO" else null
+            
+            "botones" -> {
+                if (!tieneMicro) "MICROFONO"
+                else if (!SystemUtils.isAccessibilityServiceEnabled(context, ServicioBotones::class.java)) "ACCESIBILIDAD"
+                else null
+            }
+            
+            "permanente", "suspension" -> {
+                if (!tieneMicro) "MICROFONO"
+                else if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) "NOTIFICACIONES"
+                else null
+            }
+            
             else -> null
         }
 
+        // Si falta algún permiso, abrimos la app para solicitarlo
         if (permisoFaltante != null) {
-            // Abrimos la app enviando el tipo de permiso que falta
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra("SOLICITAR_PERMISO", permisoFaltante)
@@ -78,7 +91,7 @@ class ToggleAction : ActionCallback {
             return
         }
 
-        // Si tiene permisos, procedemos normal
+        // Si todos los permisos están OK, procedemos a cambiar el estado
         updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { currentPrefs ->
             val mutablePrefs = currentPrefs.toMutablePreferences()
             when (accion) {

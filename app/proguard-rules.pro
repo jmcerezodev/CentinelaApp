@@ -17,6 +17,8 @@
 # Reglas para Jetpack Glance (Widgets)
 -keep class androidx.glance.** { *; }
 -dontwarn androidx.glance.**
+-keep class * extends androidx.glance.appwidget.GlanceAppWidgetReceiver
+-keep class * extends androidx.glance.appwidget.action.ActionCallback
 
 # Evitar que R8 elimine clases necesarias para la Biometría
 -dontwarn androidx.biometric.**
