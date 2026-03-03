@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -85,9 +86,6 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 // --- LÓGICA DE SINCRONIZACIÓN DEL WIDGET ---
-                // Solo disparamos el diálogo del Widget si:
-                // 1. El usuario está autenticado (ha pasado la huella si era necesaria)
-                // 2. NO se está mostrando la sugerencia de biometría inicial (para no solapar modales)
                 val permisoDelWidget by permisoWidgetState
                 LaunchedEffect(permisoDelWidget, estaAutenticado, mostrarSugerenciaBiometria) {
                     if (estaAutenticado && !mostrarSugerenciaBiometria && permisoDelWidget != null) {
@@ -98,27 +96,49 @@ class MainActivity : AppCompatActivity() {
                             "BATERIA" -> PermisoConsentimiento.Bateria
                             else -> null
                         }
-                        permisoWidgetState.value = null // Limpiamos la señal tras procesarla
+                        permisoWidgetState.value = null 
                     }
                 }
 
                 // GESTIÓN DE SEGURIDAD (Ciclo de Vida)
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_START) {
-                            if (prefs.seguridadBiometrica && BiometricHelper.esBiometriaDisponible(contexto)) {
-                                BiometricHelper.autenticar(
-                                    actividad = this@MainActivity,
-                                    onExito = { estaAutenticado = true },
-                                    onError = { error ->
-                                        if (error.contains("cancel", true) || error.contains("atrás", true)) finish()
-                                    }
-                                )
-                            } else {
-                                estaAutenticado = true
+                        when (event) {
+                            Lifecycle.Event.ON_START -> {
+                                if (prefs.seguridadBiometrica && BiometricHelper.esBiometriaDisponible(contexto)) {
+                                    // Bloqueamos la miniatura preventivamente hasta que se autentique
+                                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                    BiometricHelper.autenticar(
+                                        actividad = this@MainActivity,
+                                        onExito = { 
+                                            estaAutenticado = true
+                                            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                        },
+                                        onError = { error ->
+                                            if (error.contains("cancel", true) || error.contains("atrás", true)) finish()
+                                        }
+                                    )
+                                } else {
+                                    estaAutenticado = true
+                                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                }
                             }
-                        } else if (event == Lifecycle.Event.ON_STOP) {
-                            if (prefs.seguridadBiometrica) estaAutenticado = false
+                            Lifecycle.Event.ON_PAUSE -> {
+                                // Al pausar, si la seguridad está activa, ocultamos la preview de recientes
+                                if (prefs.seguridadBiometrica) {
+                                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                }
+                            }
+                            Lifecycle.Event.ON_RESUME -> {
+                                // Al volver al primer plano, si ya estamos autenticados, mostramos el contenido
+                                if (estaAutenticado) {
+                                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                                }
+                            }
+                            Lifecycle.Event.ON_STOP -> {
+                                if (prefs.seguridadBiometrica) estaAutenticado = false
+                            }
+                            else -> {}
                         }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)

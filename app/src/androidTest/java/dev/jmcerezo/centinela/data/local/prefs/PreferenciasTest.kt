@@ -23,10 +23,10 @@ class PreferenciasTest {
 
     @Test
     fun testValoresPorDefectoSonCorrectos() {
-        assertFalse(prefs.servicioPermanente)
-        assertFalse(prefs.modoSilencioso)
-        assertTrue(prefs.botonesHabilitados)
-        assertTrue(prefs.seguridadBiometrica)
+        assertFalse("El servicio permanente debe ser false por defecto", prefs.servicioPermanente)
+        assertFalse("El modo silencioso debe ser false por defecto", prefs.modoSilencioso)
+        assertFalse("Los botones deben estar deshabilitados por defecto", prefs.botonesHabilitados)
+        assertFalse("La seguridad biométrica debe estar desactivada por defecto", prefs.seguridadBiometrica)
     }
 
     @Test
@@ -46,6 +46,9 @@ class PreferenciasTest {
 
     @Test
     fun testGuardarYRecuperarBotonesHabilitados() {
+        prefs.botonesHabilitados = true
+        assertTrue(prefs.botonesHabilitados)
+
         prefs.botonesHabilitados = false
         assertFalse(prefs.botonesHabilitados)
     }
