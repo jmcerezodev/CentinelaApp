@@ -1,10 +1,13 @@
 package dev.jmcerezo.centinela.core.engine
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.*
 import android.util.Log
+import androidx.core.content.ContextCompat
 import dev.jmcerezo.centinela.core.engine.helpers.*
 import dev.jmcerezo.centinela.data.local.db.AppDatabase
 import dev.jmcerezo.centinela.data.local.db.GrabacionDato
@@ -48,9 +51,6 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         }
     }
 
-    /**
-     * SOLO PARA PRUEBAS: Limpia el estado interno para garantizar independencia entre tests.
-     */
     fun resetEstadoInterno() {
         contadorPulsaciones = 0
         ultimaPulsacion = 0
@@ -86,9 +86,17 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         if (estaGrabando) detenerGrabacion() else iniciarGrabacion()
     }
 
-    @SuppressLint("MissingPermission")
     fun iniciarGrabacion() {
         if (estaGrabando) return
+        
+        // BLINDAJE: Verificar permiso antes de cambiar estado
+        val tienePermiso = ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (!tienePermiso) {
+            Log.e("Centinela", "Intento de grabación sin permisos de micrófono")
+            system.vibrarError()
+            return
+        }
+
         val nuevoArchivo = GeneradorArchivos.prepararArchivo(contexto)
         system.despertarDispositivo()
         system.vibrarConfirmacion()

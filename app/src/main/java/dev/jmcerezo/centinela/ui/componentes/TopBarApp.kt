@@ -185,8 +185,7 @@ fun TopBarApp(
             },
             onTogglePermanente = { it ->
                 if (it) {
-                    if (Build.VERSION.SDK_INT >= 33 && !notificaciones) onSolicitarConsentimiento(PermisoConsentimiento.Notificaciones)
-                    else { servicioPermanente = true; prefs.servicioPermanente = true; sincronizarServicios() }
+                    servicioPermanente = true; prefs.servicioPermanente = true; sincronizarServicios()
                 } else {
                     servicioPermanente = false; prefs.servicioPermanente = false; sincronizarServicios()
                 }
@@ -203,6 +202,7 @@ fun TopBarApp(
             onInfoBotones = { mostrarInfoBotones = true },
             onInfoPermanente = { mostrarInfoPermanente = true },
             onInfoAntiSuspension = { mostrarInfoAntiSuspension = true },
+            onRequerirConsentimiento = onSolicitarConsentimiento,
             onDismiss = { mostrarPanelAjustes = false }
         )
     }

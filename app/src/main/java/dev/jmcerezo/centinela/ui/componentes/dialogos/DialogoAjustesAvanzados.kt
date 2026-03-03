@@ -1,16 +1,21 @@
 package dev.jmcerezo.centinela.ui.componentes.dialogos
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import dev.jmcerezo.centinela.ui.componentes.AjusteInterruptorConInfo
+import dev.jmcerezo.centinela.ui.componentes.PermisoConsentimiento
 
 @Composable
 fun DialogoAjustesAvanzados(
@@ -26,8 +31,17 @@ fun DialogoAjustesAvanzados(
     onInfoBotones: () -> Unit,
     onInfoPermanente: () -> Unit,
     onInfoAntiSuspension: () -> Unit,
+    onRequerirConsentimiento: (PermisoConsentimiento) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val contexto = LocalContext.current
+    
+    // Verificamos el permiso de micro de forma reactiva
+    val tienePermisoMicro = ContextCompat.checkSelfPermission(
+        contexto, 
+        Manifest.permission.RECORD_AUDIO
+    ) == PackageManager.PERMISSION_GRANTED
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Configuración Avanzada", color = Color.White, fontWeight = FontWeight.Bold) },
@@ -43,26 +57,38 @@ fun DialogoAjustesAvanzados(
 
                 AjusteInterruptorConInfo(
                     titulo = "Grabación con Botones",
-                    subtitulo = "Usa volumen arriba (x3) para grabar",
+                    subtitulo = if (tienePermisoMicro) "Usa volumen arriba (x3) para grabar" else "Requiere permiso de micrófono",
                     activo = botonesHabilitados,
+                    habilitado = tienePermisoMicro,
                     onInfo = onInfoBotones,
-                    onToggle = onToggleBotones
+                    onToggle = { 
+                        if (tienePermisoMicro) onToggleBotones(it) 
+                        else onRequerirConsentimiento(PermisoConsentimiento.Microfono) 
+                    }
                 )
 
                 AjusteInterruptorConInfo(
                     titulo = "Servicio Permanente",
-                    subtitulo = "Evita el cierre automático",
+                    subtitulo = if (tienePermisoMicro) "Evita el cierre automático" else "Requiere permiso de micrófono",
                     activo = servicioPermanente,
+                    habilitado = tienePermisoMicro,
                     onInfo = onInfoPermanente,
-                    onToggle = onTogglePermanente
+                    onToggle = { 
+                        if (tienePermisoMicro) onTogglePermanente(it) 
+                        else onRequerirConsentimiento(PermisoConsentimiento.Microfono) 
+                    }
                 )
 
                 AjusteInterruptorConInfo(
                     titulo = "Modo Anti-Suspensión",
-                    subtitulo = "Escucha con pantalla apagada",
+                    subtitulo = if (tienePermisoMicro) "Escucha con pantalla apagada" else "Requiere permiso de micrófono",
                     activo = modoSilencioso,
+                    habilitado = tienePermisoMicro,
                     onInfo = onInfoAntiSuspension,
-                    onToggle = onToggleSilencioso
+                    onToggle = { 
+                        if (tienePermisoMicro) onToggleSilencioso(it) 
+                        else onRequerirConsentimiento(PermisoConsentimiento.Microfono) 
+                    }
                 )
             }
         },

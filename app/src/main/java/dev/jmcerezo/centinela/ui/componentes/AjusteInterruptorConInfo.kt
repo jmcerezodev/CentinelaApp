@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -21,11 +22,14 @@ fun AjusteInterruptorConInfo(
     titulo: String,
     subtitulo: String,
     activo: Boolean,
+    habilitado: Boolean = true,
     onInfo: () -> Unit,
     onToggle: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (habilitado) 1f else 0.5f),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -42,7 +46,7 @@ fun AjusteInterruptorConInfo(
                 )
                 Text(
                     text = subtitulo, 
-                    color = Color.Gray, 
+                    color = if (habilitado) Color.Gray else Color(0xFFFF5252), 
                     fontSize = 11.sp
                 )
             }
@@ -60,7 +64,7 @@ fun AjusteInterruptorConInfo(
         }
         Switch(
             checked = activo,
-            onCheckedChange = onToggle,
+            onCheckedChange = { if (habilitado) onToggle(it) else onToggle(true) },
             modifier = Modifier.scale(0.7f),
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
