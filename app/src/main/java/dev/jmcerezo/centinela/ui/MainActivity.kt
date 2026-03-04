@@ -36,6 +36,7 @@ import dev.jmcerezo.centinela.ui.theme.CentinelaTheme
 import dev.jmcerezo.centinela.util.BiometricHelper
 import dev.jmcerezo.centinela.util.PdfReportGenerator
 import dev.jmcerezo.centinela.util.SystemUtils
+import kotlinx.coroutines.delay
 
 /**
  * Actividad principal de la aplicación Centinela.
@@ -43,7 +44,7 @@ import dev.jmcerezo.centinela.util.SystemUtils
  */
 class MainActivity : AppCompatActivity() {
 
-    // Estado reactivo para capturar solicitudes externas del Widget incluso con la app abierta
+    // Estado reactivo para capturar solicitudes externas del Widget
     private val permisoWidgetState = mutableStateOf<String?>(null)
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
@@ -55,7 +56,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         // Capturamos el permiso solicitado si la app se inicia desde el Widget
-        permisoWidgetState.value = intent.getStringExtra("SOLICITAR_PERMISO")
+        actualizarPeticionWidget(intent)
 
         setContent {
             CentinelaTheme {
@@ -77,16 +78,19 @@ class MainActivity : AppCompatActivity() {
                     mutableStateOf(!prefs.biometriaPreguntada && BiometricHelper.esBiometriaDisponible(contexto)) 
                 }
 
+                // Control de flujo secuencial
+                var esFlujoSecuencial by remember { mutableStateOf(false) }
+
                 // Lanzadores de permisos
                 val micL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
                     if (concedido) {
-                        // Al conceder micro, comprobamos si falta GPS para seguir la secuencia
-                        if (ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                        if (esFlujoSecuencial && ContextCompat.checkSelfPermission(contexto, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                             consentimientoDestacado = PermisoConsentimiento.Ubicacion
                         }
                     } else {
                         Toast.makeText(contexto, "Se requiere permiso de micro", Toast.LENGTH_SHORT).show()
                     }
+                    esFlujoSecuencial = false
                 }
 
                 val gpsL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
@@ -97,10 +101,18 @@ class MainActivity : AppCompatActivity() {
 
                 val notifL = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-                // --- LÓGICA DE SINCRONIZACIÓN DEL WIDGET ---
+                // --- LÓGICA DE SINCRONIZACIÓN DEL WIDGET (Sincronizada para Cold Start) ---
                 val permisoDelWidget by permisoWidgetState
-                LaunchedEffect(permisoDelWidget, estaAutenticado, mostrarSugerenciaBiometria) {
-                    if (estaAutenticado && !mostrarSugerenciaBiometria && permisoDelWidget != null) {
+                LaunchedEffect(permisoDelWidget, estaAutenticado) {
+                    if (estaAutenticado && permisoDelWidget != null) {
+                        // Delay de seguridad para asegurar que la ventana está lista tras el arranque
+                        delay(500)
+                        
+                        // Si venimos del widget, la prioridad es total
+                        mostrarSugerenciaBiometria = false
+                        
+                        if (permisoDelWidget == "MICROFONO") esFlujoSecuencial = true
+                        
                         consentimientoDestacado = when (permisoDelWidget) {
                             "MICROFONO" -> PermisoConsentimiento.Microfono
                             "ACCESIBILIDAD" -> PermisoConsentimiento.Accesibilidad
@@ -108,6 +120,7 @@ class MainActivity : AppCompatActivity() {
                             "BATERIA" -> PermisoConsentimiento.Bateria
                             else -> null
                         }
+                        // Solo limpiamos el estado del widget una vez que el diálogo ha sido asignado
                         permisoWidgetState.value = null 
                     }
                 }
@@ -169,12 +182,17 @@ class MainActivity : AppCompatActivity() {
                     ) {
                         TopBarApp(
                             onInfoClick = { mostrarInfoTecnica = true },
-                            onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo }
+                            onSolicitarConsentimiento = { tipo -> 
+                                esFlujoSecuencial = false
+                                consentimientoDestacado = tipo 
+                            }
                         )
                         
-                        // Componente de Estado de Seguridad (Movido desde el AppBar)
                         BotonEstadoSeguridad(
-                            onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo },
+                            onSolicitarConsentimiento = { tipo -> 
+                                esFlujoSecuencial = false
+                                consentimientoDestacado = tipo 
+                            },
                             onSolicitarDesactivacion = { tipo -> consentimientoParaDesactivar = tipo }
                         )
 
@@ -182,7 +200,10 @@ class MainActivity : AppCompatActivity() {
                             TarjetaGrabacion(
                                 gestorAudio = motor, 
                                 alVerArchivos = { },
-                                onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo }
+                                onSolicitarConsentimiento = { tipo -> 
+                                    esFlujoSecuencial = true
+                                    consentimientoDestacado = tipo 
+                                }
                             )
                         }
                         Spacer(modifier = Modifier.height(12.dp))
@@ -221,7 +242,10 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 }
                             },
-                            onDismiss = { consentimientoDestacado = null }
+                            onDismiss = { 
+                                consentimientoDestacado = null 
+                                esFlujoSecuencial = false
+                            }
                         )
                     }
 
@@ -277,6 +301,10 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        actualizarPeticionWidget(intent)
+    }
+
+    private fun actualizarPeticionWidget(intent: Intent) {
         val permiso = intent.getStringExtra("SOLICITAR_PERMISO")
         if (permiso != null) {
             permisoWidgetState.value = permiso
