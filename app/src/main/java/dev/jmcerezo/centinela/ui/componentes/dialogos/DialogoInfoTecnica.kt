@@ -19,8 +19,9 @@ fun DialogoInfoTecnica(onDismiss: () -> Unit) {
         title = { Text("Especificaciones Técnicas", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                ItemTecnico("Encriptación", "SHA-256 (Integridad de archivos)")
-                ItemTecnico("Formato de Audio", "MPEG-4 / AAC (Alta fidelidad)")
+                ItemTecnico("Integridad", "Hash SHA-256 (Verificación forense)")
+                ItemTecnico("Calidad de Audio", "PCM Lineal / WAV @ 44.1kHz (Sin pérdida)")
+                ItemTecnico("Procesado de Voz", "DSP: Supresión de ruido y control de ganancia auto.")
                 ItemTecnico("Ubicación", "Coordenadas GPS y Geocodificación inversa")
                 ItemTecnico("Base de Datos", "Room Persistence Library (Cifrada)")
             }
