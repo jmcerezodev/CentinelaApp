@@ -3,6 +3,7 @@ package dev.jmcerezo.centinela.core.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -23,12 +24,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
+import dev.jmcerezo.centinela.ui.MainActivity
 
 /**
  * SERVICIO DE PERSISTENCIA Y DETECCIÓN EN SEGUNDO PLANO
- * 
- * Gestiona la notificación, el silencio digital y la detección de volumen
- * asegurando que Android no mate el proceso durante la grabación.
  */
 class CentinelaService : Service() {
 
@@ -53,10 +52,7 @@ class CentinelaService : Service() {
                     if (streamType == AudioManager.STREAM_MUSIC) {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
-                        
-                        // Delegamos la detección al motor para evitar duplicados si ServicioBotones también está activo
                         if (nuevoVol > antiguoVol) motor.registrarPulsacion()
-                        
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
                         }
@@ -119,11 +115,23 @@ class CentinelaService : Service() {
             manager?.createNotificationChannel(channel)
         }
 
+        // Crear Intent para abrir la aplicación
+        val intentApp = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intentApp, 
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         val titulo = if (grabando) "CENTINELA: CAPTURANDO EVIDENCIA" else "Sistema Centinela"
+        
+        // LÓGICA DE AGRUPACIÓN: Construcción de texto dinámico combinado
         val texto = when {
             grabando -> "La grabación está activa y protegida."
+            prefs.servicioPermanente && prefs.modoSilencioso -> "Servicio Permanente y Anti-Suspensión activos"
             prefs.modoSilencioso -> "Modo Anti-Suspensión activo"
-            else -> "Servicio de seguridad activo"
+            else -> "Servicio Permanente activo"
         }
 
         val notification = NotificationCompat.Builder(this, channelId)
@@ -131,6 +139,7 @@ class CentinelaService : Service() {
             .setContentText(texto)
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setOngoing(true)
+            .setContentIntent(pendingIntent) // Al pulsar, abre la app
             .setPriority(if (grabando) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
             .build()
 
