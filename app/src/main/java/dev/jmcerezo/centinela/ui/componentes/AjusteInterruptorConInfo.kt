@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -19,7 +21,8 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Componente de fila para un ajuste con interruptor o botón de activación.
- * Garantiza que los botones de información estén siempre alineados verticalmente.
+ * Garantiza que los botones de información estén siempre alineados verticalmente
+ * y que el espaciado entre filas sea uniforme.
  */
 @Composable
 fun AjusteInterruptorConInfo(
@@ -31,7 +34,9 @@ fun AjusteInterruptorConInfo(
     onToggle: (Boolean) -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 48.dp), // Altura mínima para uniformidad entre 1 y 2 líneas de texto
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
@@ -61,7 +66,9 @@ fun AjusteInterruptorConInfo(
             // Botón de información (Círculo azul, letra 'i' blanca perfectamente centrada)
             IconButton(
                 onClick = onInfo,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier
+                    .size(32.dp)
+                    .semantics { contentDescription = "Información" } // Para accesibilidad y tests
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
