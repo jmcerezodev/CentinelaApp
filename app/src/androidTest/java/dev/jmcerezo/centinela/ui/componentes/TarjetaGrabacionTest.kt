@@ -23,16 +23,18 @@ class TarjetaGrabacionTest {
     @Before
     fun setup() {
         motor = GrabadoraMotor.getInstance(contexto)
+        // Aseguramos que el motor esté detenido antes de empezar
+        if (motor.estaGrabando) {
+            motor.detenerGrabacion()
+        }
         motor.resetEstadoInterno()
         
-        // Otorgamos permisos de forma estable al inicio
         val packageName = contexto.packageName
         val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
         uiAutomation.executeShellCommand("pm grant $packageName ${Manifest.permission.RECORD_AUDIO}")
         uiAutomation.executeShellCommand("pm grant $packageName ${Manifest.permission.ACCESS_FINE_LOCATION}")
         
-        // Pausa generosa para que el S23 procese los permisos
-        Thread.sleep(1500)
+        Thread.sleep(1000)
     }
 
     @Test
@@ -45,23 +47,26 @@ class TarjetaGrabacionTest {
             )
         }
 
-        // 1. Verificar estado inicial
+        // 1. Verificar estado inicial: Debe mostrar REC
         composeTestRule.onNodeWithText("REC").assertIsDisplayed()
 
         // 2. Iniciar grabación
         composeTestRule.onNodeWithText("REC").performClick()
 
-        // 3. Esperar a que el motor cambie el estado visual a STOP
-        composeTestRule.waitUntil(8000) {
+        // 3. Esperar con timeout extendido a que el estado cambie a STOP
+        // Aumentamos a 10 segundos por lentitud del emulador/dispositivo en tests
+        composeTestRule.waitUntil(10000) {
             try {
                 composeTestRule.onNodeWithText("STOP").assertIsDisplayed()
                 true
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 false
             }
         }
         
-        // Limpieza
-        motor.resetEstadoInterno()
+        // Limpieza final
+        if (motor.estaGrabando) {
+            motor.detenerGrabacion()
+        }
     }
 }

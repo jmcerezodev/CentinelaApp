@@ -1,6 +1,5 @@
 package dev.jmcerezo.centinela.ui
 
-import android.Manifest
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,10 +13,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Test de instrumentación para verificar el flujo de permisos y diálogos de consentimiento.
- * Diseñado para ser robusto ante la presencia o ausencia de permisos en el dispositivo.
- */
 @RunWith(AndroidJUnit4::class)
 class PermisosCicloTest {
 
@@ -27,50 +22,49 @@ class PermisosCicloTest {
     @Before
     fun setup() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        
-        // Limpiamos preferencias para evitar bloqueos por biometría durante el test
         context.getSharedPreferences("centinela_prefs", Context.MODE_PRIVATE)
             .edit()
             .clear()
             .commit()
             
-        // Reset motor
-        GrabadoraMotor.getInstance(context).resetEstadoInterno()
+        val motor = GrabadoraMotor.getInstance(context)
+        if (motor.estaGrabando) motor.detenerGrabacion()
+        motor.resetEstadoInterno()
         
-        Thread.sleep(500)
+        Thread.sleep(1000)
     }
 
     @Test
     fun testFlujoBotonRec() {
-        // 1. Verificamos que el botón REC existe
-        val recButton = composeTestRule.onNodeWithText("REC")
-        recButton.assertIsDisplayed()
-
-        // 2. Ejecutamos la acción
-        recButton.performClick()
-
-        // 3. Verificamos que la app ha reaccionado.
-        // Puede ocurrir dos cosas según el estado del dispositivo:
-        // A. Se muestra el diálogo de consentimiento (porque faltan permisos)
-        // B. Se inicia la grabación (porque ya tiene permisos)
-        
-        val esVisibleDialogo = try {
-            composeTestRule.onNodeWithText("SÍ, CONTINUAR").assertIsDisplayed()
-            true
-        } catch (e: AssertionError) {
-            false
+        // Aseguramos que el botón REC sea visible antes de interactuar
+        composeTestRule.waitUntil(5000) {
+            try {
+                composeTestRule.onNodeWithText("REC").assertIsDisplayed()
+                true
+            } catch (e: Throwable) {
+                false
+            }
         }
 
-        val esVisibleGrabando = try {
-            composeTestRule.onNodeWithText("STOP").assertIsDisplayed()
-            true
-        } catch (e: AssertionError) {
-            false
-        }
+        composeTestRule.onNodeWithText("REC").performClick()
 
-        // El test es exitoso si cualquiera de las dos reacciones válidas ocurre
-        assert(esVisibleDialogo || esVisibleGrabando) {
-            "Al pulsar REC debe aparecer el diálogo de consentimiento o iniciarse la grabación"
+        // Esperamos a que aparezca cualquiera de las dos respuestas válidas
+        composeTestRule.waitUntil(10000) {
+            val esVisibleDialogo = try {
+                composeTestRule.onNodeWithText("SÍ, CONTINUAR").assertIsDisplayed()
+                true
+            } catch (e: Throwable) {
+                false
+            }
+
+            val esVisibleGrabando = try {
+                composeTestRule.onNodeWithText("STOP").assertIsDisplayed()
+                true
+            } catch (e: Throwable) {
+                false
+            }
+
+            esVisibleDialogo || esVisibleGrabando
         }
     }
 }
