@@ -1,14 +1,12 @@
 package dev.jmcerezo.centinela.util
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.PowerManager
 import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
+import android.text.TextUtils
 
 /**
  * Utilidades de sistema para gestionar permisos y estados del dispositivo.
@@ -16,15 +14,26 @@ import android.view.accessibility.AccessibilityManager
 object SystemUtils {
 
     /**
-     * Comprueba si un servicio de accesibilidad específico está activado en los ajustes del sistema.
+     * Comprueba si un servicio de accesibilidad específico está activado.
+     * Utiliza el método más fiable: leer directamente la configuración segura de Android.
      */
     fun isAccessibilityServiceEnabled(context: Context, service: Class<out AccessibilityService>): Boolean {
-        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-        return enabledServices.any { 
-            it.resolveInfo.serviceInfo.packageName == context.packageName && 
-            it.resolveInfo.serviceInfo.name == service.name 
+        val expectedService = "${context.packageName}/${service.canonicalName}"
+        val enabledServices = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+
+        val colonSplitter = TextUtils.SimpleStringSplitter(':')
+        colonSplitter.setString(enabledServices)
+
+        while (colonSplitter.hasNext()) {
+            val componentName = colonSplitter.next()
+            if (componentName.equals(expectedService, ignoreCase = true)) {
+                return true
+            }
         }
+        return false
     }
 
     /**

@@ -1,7 +1,6 @@
 package dev.jmcerezo.centinela.core.engine
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -21,6 +20,7 @@ import java.util.Locale
 
 /**
  * MOTOR DE GRABACIÓN CENTINELA (Singleton)
+ * Gestiona el ciclo de vida de las evidencias y la interacción con el hardware.
  */
 class GrabadoraMotor private constructor(private val contexto: Context) {
 
@@ -34,7 +34,7 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     private val scope = CoroutineScope(Dispatchers.IO)
 
     var onActualizarLista: (() -> Unit)? = null
-    var estaGrabando: Boolean = false
+    @Volatile var estaGrabando: Boolean = false
         private set
 
     private var contadorPulsaciones = 0
@@ -57,8 +57,7 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
         ultimaAccionExitosa = 0
         ultimaPulsacionRecibida = 0
         if (estaGrabando) {
-            estaGrabando = false
-            recorder.detener()
+            detenerGrabacion()
         }
     }
 
@@ -89,28 +88,33 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     fun iniciarGrabacion() {
         if (estaGrabando) return
         
-        // BLINDAJE: Verificar permiso antes de cambiar estado
         val tienePermiso = ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         if (!tienePermiso) {
-            Log.e("Centinela", "Intento de grabación sin permisos de micrófono")
             system.vibrarError()
             return
         }
 
-        val nuevoArchivo = GeneradorArchivos.prepararArchivo(contexto)
-        system.despertarDispositivo()
-        system.vibrarConfirmacion()
+        try {
+            val nuevoArchivo = GeneradorArchivos.prepararArchivo(contexto)
+            system.despertarDispositivo()
+            system.vibrarConfirmacion()
 
-        if (recorder.iniciar(nuevoArchivo)) {
-            estaGrabando = true
-            notificarCambioGlobal()
-        } else {
+            if (recorder.iniciar(nuevoArchivo)) {
+                estaGrabando = true
+                notificarCambioGlobal()
+            } else {
+                system.vibrarError()
+            }
+        } catch (e: Exception) {
+            Log.e("Centinela", "Error fatal al iniciar grabación: ${e.message}")
+            estaGrabando = false
             system.vibrarError()
         }
     }
 
     fun detenerGrabacion(): String {
         if (!estaGrabando) return ""
+        
         estaGrabando = false
         val archivoAudio = recorder.detener()
         system.vibrarConfirmacion()
@@ -130,12 +134,17 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     }
 
     private fun notificarCambioGlobal() {
-        Handler(Looper.getMainLooper()).post { onActualizarLista?.invoke() }
-        contexto.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName))
+        // Aseguramos que la actualización de UI ocurra en el hilo principal
+        Handler(Looper.getMainLooper()).post { 
+            onActualizarLista?.invoke() 
+        }
+        // Notificamos a los servicios del cambio de estado
+        val intent = Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName)
+        contexto.sendBroadcast(intent)
     }
 
     private fun persistirEvidencia(file: File, hash: String, ubicacion: String) {
-        val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(file.lastModified())
+        val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(System.currentTimeMillis())
         scope.launch {
             dao.insert(GrabacionDato(
                 nombre = file.nameWithoutExtension,
@@ -149,9 +158,13 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
 
     fun eliminarGrabacion(grabacion: GrabacionDato) {
         scope.launch {
-            val file = File(grabacion.rutaArchivo)
-            if (file.exists()) file.delete()
-            dao.delete(grabacion)
+            try {
+                val file = File(grabacion.rutaArchivo)
+                if (file.exists()) file.delete()
+                dao.delete(grabacion)
+            } catch (e: Exception) {
+                Log.e("Centinela", "Error al eliminar: ${e.message}")
+            }
         }
     }
 
@@ -161,7 +174,9 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
                 val nombreLimpio = nuevoNombre.trim().replace(Regex("[^a-zA-Z0-9_\\- ]"), "_")
                 if (nombreLimpio.isEmpty()) return@launch
                 val archivoOriginal = File(grabacion.rutaArchivo)
-                val nuevoArchivo = File(archivoOriginal.parent, "$nombreLimpio.m4a")
+                val extension = archivoOriginal.extension
+                val nuevoArchivo = File(archivoOriginal.parent, "$nombreLimpio.$extension")
+
                 if (archivoOriginal.exists() && archivoOriginal.renameTo(nuevoArchivo)) {
                     dao.update(grabacion.copy(nombre = nombreLimpio, rutaArchivo = nuevoArchivo.absolutePath))
                 }

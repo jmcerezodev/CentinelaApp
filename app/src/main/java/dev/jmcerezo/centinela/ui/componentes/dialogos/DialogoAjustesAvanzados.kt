@@ -1,7 +1,11 @@
 package dev.jmcerezo.centinela.ui.componentes.dialogos
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,9 +15,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import dev.jmcerezo.centinela.core.service.ServicioBotones
 import dev.jmcerezo.centinela.ui.componentes.AjusteInterruptorConInfo
 import dev.jmcerezo.centinela.ui.componentes.PermisoConsentimiento
@@ -37,20 +44,38 @@ fun DialogoAjustesAvanzados(
     onDismiss: () -> Unit
 ) {
     val contexto = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     
-    // Verificación de todos los permisos necesarios de forma dinámica
-    val tieneMicro = ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-    val tieneAccesibilidad = SystemUtils.isAccessibilityServiceEnabled(contexto, ServicioBotones::class.java)
-    val tieneNotif = if (android.os.Build.VERSION.SDK_INT >= 33) {
-        ContextCompat.checkSelfPermission(contexto, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-    } else true
+    // Estados reactivos para los permisos que se actualizarán al volver a la app
+    var tieneMicro by remember { mutableStateOf(ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) }
+    var tieneAccesibilidad by remember { mutableStateOf(SystemUtils.isAccessibilityServiceEnabled(contexto, ServicioBotones::class.java)) }
+    var tieneNotif by remember { 
+        mutableStateOf(if (Build.VERSION.SDK_INT >= 33) {
+            ContextCompat.checkSelfPermission(contexto, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        } else true)
+    }
+
+    // Observador del ciclo de vida para refrescar estados automáticamente
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                tieneMicro = ContextCompat.checkSelfPermission(contexto, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                tieneAccesibilidad = SystemUtils.isAccessibilityServiceEnabled(contexto, ServicioBotones::class.java)
+                if (Build.VERSION.SDK_INT >= 33) {
+                    tieneNotif = ContextCompat.checkSelfPermission(contexto, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Configuración Avanzada", color = Color.White, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // 1. BIOMETRÍA (Independiente)
+                // 1. BIOMETRÍA
                 AjusteInterruptorConInfo(
                     titulo = "Protección Huella",
                     subtitulo = "Pedir huella al abrir la app",
@@ -67,7 +92,7 @@ fun DialogoAjustesAvanzados(
                         if (!tieneMicro) append("Requiere permiso de Microfono")
                         if (!tieneAccesibilidad) { if (isNotEmpty()) append("\n"); append("Requiere permiso de Accesibilidad") }
                     },
-                    activo = botonesHabilitados,
+                    activo = botonesHabilitados && okBotones, // Blindaje: solo activo si tiene permisos
                     habilitado = okBotones,
                     onInfo = onInfoBotones,
                     onToggle = { 
@@ -85,7 +110,7 @@ fun DialogoAjustesAvanzados(
                         if (!tieneMicro) append("Requiere permiso de Microfono")
                         if (!tieneNotif) { if (isNotEmpty()) append("\n"); append("Requiere permiso de Notificaciones") }
                     },
-                    activo = servicioPermanente,
+                    activo = servicioPermanente && okPermanente, // Blindaje
                     habilitado = okPermanente,
                     onInfo = onInfoPermanente,
                     onToggle = { 
@@ -103,7 +128,7 @@ fun DialogoAjustesAvanzados(
                         if (!tieneMicro) append("Requiere permiso de Microfono")
                         if (!tieneNotif) { if (isNotEmpty()) append("\n"); append("Requiere permiso de Notificaciones") }
                     },
-                    activo = modoSilencioso,
+                    activo = modoSilencioso && okAnti, // Blindaje
                     habilitado = okAnti,
                     onInfo = onInfoAntiSuspension,
                     onToggle = { 
