@@ -3,11 +3,7 @@ package dev.jmcerezo.centinela.core.service
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.*
-import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -17,7 +13,6 @@ import android.media.session.PlaybackState
 import android.os.*
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
-import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import dev.jmcerezo.centinela.core.engine.GrabadoraMotor
 import dev.jmcerezo.centinela.data.local.prefs.Preferencias
@@ -25,9 +20,11 @@ import dev.jmcerezo.centinela.data.local.prefs.Preferencias
 /**
  * SERVICIO DE ACCESIBILIDAD: CENTINELA
  * 
- * Es el guardián de la persistencia del sistema. Gestiona la detección de botones 
- * y utiliza estrategias agresivas para evitar que Android suspenda la app 
+ * Es el guardián de la persistencia del sistema. Gestiona la detección de botones
+ * y utiliza estrategias agresivas para evitar que Android suspenda la app
  * cuando la pantalla se apaga.
+ * 
+ * NOTA: No utiliza startForeground para evitar duplicar notificaciones.
  */
 @SuppressLint("AccessibilityService")
 class ServicioBotones : AccessibilityService() {
@@ -53,11 +50,9 @@ class ServicioBotones : AccessibilityService() {
                     if (streamType == AudioManager.STREAM_MUSIC) {
                         val nuevoVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
                         val antiguoVol = intent.getIntExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", -1)
-                        
-                        // Si el volumen sube, registramos pulsación (método redundante de seguridad)
+
                         if (nuevoVol > antiguoVol) motor.registrarPulsacion()
 
-                        // Rearme: si llegamos al máximo con pantalla apagada, bajamos un punto
                         if (nuevoVol >= audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) && !powerManager.isInteractive) {
                             asegurarMargenVolumen()
                         }
@@ -91,32 +86,7 @@ class ServicioBotones : AccessibilityService() {
         }
         ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         
-        // Llamada inmediata para evitar ForegroundServiceDidNotStartInTimeException
-        forzarInicioForeground()
         actualizarEstadoServicio()
-    }
-
-    private fun forzarInicioForeground() {
-        val channelId = "centinela_botones_persist"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "Servicio de Detección", NotificationManager.IMPORTANCE_LOW)
-            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
-        }
-
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Sistema Centinela")
-            .setContentText("Detección de botones activa")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
-            .setOngoing(true)
-            .build()
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(2001, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(2001, notification)
-            }
-        } catch (e: Exception) {}
     }
 
     private fun actualizarEstadoServicio() {
@@ -128,13 +98,11 @@ class ServicioBotones : AccessibilityService() {
     }
 
     private fun activarModoInmortal() {
-        // 1. WakeLock: Impide que el procesador entre en modo Deep Sleep
         if (wakeLock == null || !wakeLock!!.isHeld) {
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Centinela:AccessibilityCPU")
             wakeLock?.acquire(60 * 60 * 1000L)
         }
 
-        // 2. MediaSession: Prioridad multimedia para que Android no cierre el proceso
         if (mediaSession == null) {
             mediaSession = MediaSession(this, "CentinelaPersistentSession").apply {
                 setPlaybackState(PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, 0, 1.0f).build())
@@ -142,7 +110,6 @@ class ServicioBotones : AccessibilityService() {
             }
         }
 
-        // 3. Audio Silencioso (Anti-Doze): Vital para capturar audio con pantalla apagada
         if (audioTrackSilencio == null) {
             hiloSilencio = Thread {
                 try {

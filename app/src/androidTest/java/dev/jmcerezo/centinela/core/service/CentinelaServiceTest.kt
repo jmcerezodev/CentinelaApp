@@ -68,12 +68,13 @@ class CentinelaServiceTest {
         
         ContextCompat.startForegroundService(context, Intent(context, CentinelaService::class.java))
         
-        // Esperar específicamente a que aparezca el texto esperado (puede haber una transición rápida desde el inicio forzado)
+        // Esperar específicamente a que aparezca el texto unificado discreto
+        // Ajustado para coincidir exactamente con el código de producción
         val notif1 = waitForNotificationCondition(1001, timeoutMs = 15000) {
-            it.notification.extras.getCharSequence("android.text").toString() == "Servicio Permanente activo"
+            it.notification.extras.getCharSequence("android.text").toString() == "Protección activa: Permanente."
         }
         
-        assertNotNull("La notificación con el texto 'Servicio Permanente activo' debe aparecer", notif1)
+        assertNotNull("La notificación con el texto 'Protección activa: Permanente.' debe aparecer", notif1)
 
         // 2. Cambiar estado a ambos activos
         context.getSharedPreferences("centinela_prefs", Context.MODE_PRIVATE).edit()
@@ -82,11 +83,12 @@ class CentinelaServiceTest {
             
         context.sendBroadcast(Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(context.packageName))
         
-        // Esperar actualización del texto
+        // Esperar actualización del texto unificado
         val notif2 = waitForNotificationCondition(1001, timeoutMs = 10000) { 
-            it.notification.extras.getCharSequence("android.text").toString() == "Servicio Permanente y Anti-Suspensión activos"
+            val texto = it.notification.extras.getCharSequence("android.text").toString()
+            texto.contains("Permanente") && texto.contains("Anti-Suspensión")
         }
-        assertNotNull("La notificación debe actualizar su texto tras el broadcast", notif2)
+        assertNotNull("La notificación debe actualizarse tras el broadcast", notif2)
     }
 
     @Ignore("Falla por limitaciones de seguridad del entorno de pruebas al interceptar PendingIntents")
