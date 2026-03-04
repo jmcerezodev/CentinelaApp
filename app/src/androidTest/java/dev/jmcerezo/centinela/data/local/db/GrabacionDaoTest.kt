@@ -44,4 +44,27 @@ class GrabacionDaoTest {
         assertEquals(1, lista.size)
         assertEquals("Test", lista[0].nombre)
     }
+
+    @Test
+    fun testActualizarFavorito() = runBlocking {
+        val grabacion = GrabacionDato(
+            nombre = "Test Favorito", 
+            rutaArchivo = "ruta_fav", 
+            fecha = "21/10/2024", 
+            hash = "456"
+        )
+        dao.insert(grabacion)
+        
+        // Recuperamos la grabacion insertada (Room le asigna un ID)
+        val insertada = dao.getAll().first()[0]
+        
+        // Marcamos como favorito y actualizamos
+        val actualizada = insertada.copy(esFavorito = true)
+        dao.update(actualizada)
+        
+        // Verificamos el cambio
+        val resultado = dao.getAll().first()[0]
+        assertTrue("La grabación debería estar marcada como favorita", resultado.esFavorito)
+        assertEquals("Test Favorito", resultado.nombre)
+    }
 }
