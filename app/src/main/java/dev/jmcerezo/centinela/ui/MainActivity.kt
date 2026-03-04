@@ -169,9 +169,15 @@ class MainActivity : AppCompatActivity() {
                     ) {
                         TopBarApp(
                             onInfoClick = { mostrarInfoTecnica = true },
+                            onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo }
+                        )
+                        
+                        // Componente de Estado de Seguridad (Movido desde el AppBar)
+                        BotonEstadoSeguridad(
                             onSolicitarConsentimiento = { tipo -> consentimientoDestacado = tipo },
                             onSolicitarDesactivacion = { tipo -> consentimientoParaDesactivar = tipo }
                         )
+
                         Box(modifier = Modifier.wrapContentHeight()) {
                             TarjetaGrabacion(
                                 gestorAudio = motor, 
