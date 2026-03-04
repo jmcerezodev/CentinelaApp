@@ -52,7 +52,7 @@ fun ListaEvidencias(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             color = Color(0xFF141725),
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            shape = RoundedCornerShape(24.dp, 24.dp),
             border = BorderStroke(1.dp, Color(0xFF1F2235))
         ) {
             LazyColumn(
@@ -64,17 +64,19 @@ fun ListaEvidencias(
                     items = listaOrdenada,
                     key = { it.rutaArchivo } // Clave única para optimizar el rendimiento del LazyColumn
                 ) { grabacion ->
-                    TarjetaEvidencia(
-                        grabacion = grabacion,
-                        estaMarcado = grabacion.esFavorito,
-                        onToggleFavorite = { onToggleFavorite(grabacion) },
-                        onPlay = { onPlay(grabacion) },
-                        onRename = { onRename(grabacion) },
-                        onShare = { onShare(grabacion) },
-                        onSaveToDevice = { onSaveToDevice(grabacion) },
-                        onDelete = { onDelete(grabacion) },
-                        onGeneratePDF = { onGeneratePDF(grabacion) }
-                    )
+                    Box(modifier = Modifier.animateItem()) {
+                        TarjetaEvidencia(
+                            grabacion = grabacion,
+                            estaMarcado = grabacion.esFavorito,
+                            onToggleFavorite = { onToggleFavorite(grabacion) },
+                            onPlay = { onPlay(grabacion) },
+                            onRename = { onRename(grabacion) },
+                            onShare = { onShare(grabacion) },
+                            onSaveToDevice = { onSaveToDevice(grabacion) },
+                            onDelete = { onDelete(grabacion) },
+                            onGeneratePDF = { onGeneratePDF(grabacion) }
+                        )
+                    }
                 }
             }
         }
