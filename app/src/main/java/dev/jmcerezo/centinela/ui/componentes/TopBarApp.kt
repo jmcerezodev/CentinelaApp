@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -94,7 +96,23 @@ fun TopBarApp(
                 Icon(imageVector = Icons.Default.Settings, contentDescription = "Configuración Avanzada", tint = Color(0xFF3D5AFE), modifier = Modifier.size(24.dp))
             }
             IconButton(onClick = onInfoClick) {
-                Icon(imageVector = Icons.Default.Info, contentDescription = "Información", tint = Color(0xFF3D5AFE), modifier = Modifier.size(24.dp))
+                // Caja azul con la letra 'i' en blanco perfectamente centrada
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color(0xFF3D5AFE), CircleShape)
+                ) {
+                    Text(
+                        text = "i",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false)
+                        )
+                    )
+                }
             }
         }
     }
