@@ -1,11 +1,14 @@
 package dev.jmcerezo.centinela.core.engine
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.*
+import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import dev.jmcerezo.centinela.core.engine.helpers.*
 import dev.jmcerezo.centinela.data.local.db.AppDatabase
@@ -14,6 +17,7 @@ import dev.jmcerezo.centinela.util.IntegrityUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -134,11 +138,9 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
     }
 
     private fun notificarCambioGlobal() {
-        // Aseguramos que la actualización de UI ocurra en el hilo principal
         Handler(Looper.getMainLooper()).post { 
             onActualizarLista?.invoke() 
         }
-        // Notificamos a los servicios del cambio de estado
         val intent = Intent("dev.jmcerezo.ACTUALIZAR_CONFIGURACION").setPackage(contexto.packageName)
         contexto.sendBroadcast(intent)
     }
@@ -182,6 +184,54 @@ class GrabadoraMotor private constructor(private val contexto: Context) {
                 }
             } catch (e: Exception) {
                 Log.e("Centinela", "Error al renombrar: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Guarda la grabación en la carpeta pública de música del dispositivo.
+     * Utiliza MediaStore para asegurar compatibilidad con Android 10+.
+     */
+    fun guardarEnDispositivo(grabacion: GrabacionDato) {
+        scope.launch {
+            try {
+                val file = File(grabacion.rutaArchivo)
+                if (!file.exists()) return@launch
+
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Audio.Media.DISPLAY_NAME, "${grabacion.nombre}.${file.extension}")
+                    put(MediaStore.Audio.Media.MIME_TYPE, "audio/wav")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/Centinela")
+                        put(MediaStore.Audio.Media.IS_PENDING, 1)
+                    }
+                }
+
+                val resolver = contexto.contentResolver
+                val uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+                uri?.let { destinationUri ->
+                    resolver.openOutputStream(destinationUri)?.use { outputStream ->
+                        file.inputStream().use { inputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        contentValues.clear()
+                        contentValues.put(MediaStore.Audio.Media.IS_PENDING, 0)
+                        resolver.update(destinationUri, contentValues, null, null)
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(contexto, "Guardado en Music/Centinela", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("Centinela", "Error al guardar en dispositivo: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(contexto, "Error al guardar archivo", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

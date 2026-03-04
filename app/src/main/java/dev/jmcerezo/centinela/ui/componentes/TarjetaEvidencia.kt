@@ -21,7 +21,7 @@ import java.io.File
 
 /**
  * Componente que muestra la información de una grabación individual.
- * Permite reproducir, renombrar, compartir y eliminar la evidencia.
+ * Permite reproducir, renombrar, compartir, guardar y eliminar la evidencia.
  */
 @Composable
 fun TarjetaEvidencia(
@@ -31,6 +31,7 @@ fun TarjetaEvidencia(
     onPlay: () -> Unit,
     onRename: () -> Unit,
     onShare: () -> Unit,
+    onSaveToDevice: () -> Unit,
     onDelete: () -> Unit,
     onGeneratePDF: () -> Unit
 ) {
@@ -130,6 +131,11 @@ fun TarjetaEvidencia(
                                 text = { Text("Renombrar", color = Color.White) },
                                 leadingIcon = { Icon(Icons.Default.Edit, null, tint = Color.Gray) },
                                 onClick = { menuExpandido = false; onRename() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Guardar", color = Color.White) },
+                                leadingIcon = { Icon(Icons.Default.Download, null, tint = Color.White) },
+                                onClick = { menuExpandido = false; onSaveToDevice() }
                             )
                             DropdownMenuItem(
                                 text = { Text("Compartir Audio", color = Color.White) },

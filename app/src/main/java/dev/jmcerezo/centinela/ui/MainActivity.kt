@@ -214,6 +214,7 @@ class MainActivity : AppCompatActivity() {
                                 onPlay = { grab -> motor.reproducirAudio(grab) },
                                 onRename = { grab -> archivoParaRenombrar = grab },
                                 onShare = { grab -> motor.compartirArchivo(grab) },
+                                onSaveToDevice = { grab -> motor.guardarEnDispositivo(grab) },
                                 onDelete = { grab -> archivoParaEliminar = grab },
                                 onToggleFavorite = { grab -> viewModel.actualizar(grab.copy(esFavorito = !grab.esFavorito)) },
                                 onGeneratePDF = { grab -> PdfReportGenerator.generarYCompartir(contexto, grab) }

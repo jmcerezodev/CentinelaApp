@@ -25,6 +25,7 @@ fun ListaEvidencias(
     onPlay: (GrabacionDato) -> Unit,
     onRename: (GrabacionDato) -> Unit,
     onShare: (GrabacionDato) -> Unit,
+    onSaveToDevice: (GrabacionDato) -> Unit,
     onDelete: (GrabacionDato) -> Unit,
     onToggleFavorite: (GrabacionDato) -> Unit,
     onGeneratePDF: (GrabacionDato) -> Unit
@@ -70,6 +71,7 @@ fun ListaEvidencias(
                         onPlay = { onPlay(grabacion) },
                         onRename = { onRename(grabacion) },
                         onShare = { onShare(grabacion) },
+                        onSaveToDevice = { onSaveToDevice(grabacion) },
                         onDelete = { onDelete(grabacion) },
                         onGeneratePDF = { onGeneratePDF(grabacion) }
                     )

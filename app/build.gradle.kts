@@ -61,6 +61,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    // Añadimos iconos extendidos para tener acceso a Icons.Default.Download
+    implementation("androidx.compose.material:material-icons-extended")
 
     implementation("androidx.appcompat:appcompat:1.7.0")
 
