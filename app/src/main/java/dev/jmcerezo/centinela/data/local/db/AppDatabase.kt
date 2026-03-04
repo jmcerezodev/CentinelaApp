@@ -7,24 +7,17 @@ import androidx.room.RoomDatabase
 
 /**
  * Base de datos principal de la aplicación utilizando Room.
- * 
- * Gestiona la persistencia de las grabaciones y sus metadatos.
+ * exportSchema = false evita errores durante la compilación de Release.
  */
-@Database(entities = [GrabacionDato::class], version = 2)
+@Database(entities = [GrabacionDato::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     
-    /**
-     * Proporciona el DAO para interactuar con la tabla de grabaciones.
-     */
     abstract fun grabacionDao(): GrabacionDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        /**
-         * Obtiene la instancia única de la base de datos (Patrón Singleton).
-         */
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(

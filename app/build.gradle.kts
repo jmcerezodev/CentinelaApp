@@ -12,26 +12,21 @@ android {
         applicationId = "dev.jmcerezo.centinela"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            // Habilitamos la ofuscación y optimización de código (R8)
             isMinifyEnabled = true
-            // Eliminamos recursos que no se utilizan para reducir el tamaño del AAB
             isShrinkResources = true
-
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-
-            // Configuración recomendada para producción
-            signingConfig = signingConfigs.getByName("debug") // Cambiar por signingConfig de producción en el futuro
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     
@@ -44,12 +39,16 @@ android {
         compose = true
     }
 
-    // Configuración específica para App Bundle
     bundle {
         language { enableSplit = true }
         density { enableSplit = true }
         abi { enableSplit = true }
     }
+}
+
+// Configuración de KSP corregida
+ksp {
+    arg("room.schemaLocation", "schemas")
 }
 
 dependencies {
@@ -63,22 +62,16 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
 
-    // AndroidX AppCompat (Necesaria para Biometric)
     implementation("androidx.appcompat:appcompat:1.7.0")
 
-    // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // Glance (Widgets)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
 
-    // PDF Generation
     implementation(libs.itext7.core)
-
-    // Biometric Security
     implementation(libs.androidx.biometric)
 
     testImplementation(libs.junit)

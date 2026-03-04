@@ -15,12 +15,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.jmcerezo.centinela.core.service.ServicioBotones
 import dev.jmcerezo.centinela.ui.componentes.AjusteInterruptorConInfo
 import dev.jmcerezo.centinela.ui.componentes.PermisoConsentimiento

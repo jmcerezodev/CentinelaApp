@@ -3,53 +3,60 @@ package dev.jmcerezo.centinela.core.engine.helpers
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Geocoder
+import android.location.Location
+import android.os.Build
+import android.util.Log
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import java.util.Locale
 
 /**
- * Gestor especializado en la captura de coordenadas GPS y dirección física.
- * Soluciona la obtención de ubicación de forma asíncrona y en un hilo de trabajo.
+ * Gestiona la captura de ubicación GPS y la traducción a direcciones físicas.
  */
 class LocationManagerHelper(private val contexto: Context) {
 
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(contexto)
 
     /**
-     * Inicia la captura asíncrona de la ubicación actual.
-     * Ejecuta el Geocoder en un hilo separado para no bloquear el principal.
-     * @param onLocationReady Callback que se invoca con la dirección formateada o un mensaje de error.
+     * Captura la ubicación actual del dispositivo y la traduce a una dirección legible.
      */
     @SuppressLint("MissingPermission")
-    fun capturarUbicacionActual(onLocationReady: (String) -> Unit) {
-        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-            .addOnSuccessListener { location ->
-                if (location == null) {
-                    onLocationReady("Ubicación no disponible")
-                    return@addOnSuccessListener
+    fun capturarUbicacionActual(onResultado: (String) -> Unit) {
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
+            .addOnSuccessListener { location: Location? ->
+                if (location != null) {
+                    obtenerDireccion(location.latitude, location.longitude, onResultado)
+                } else {
+                    onResultado("Ubicación no disponible")
                 }
-
-                // Geocoder es bloqueante, ejecutar en hilo de trabajo
-                Thread {
-                    val resultado = try {
-                        val geocoder = Geocoder(contexto, Locale.getDefault())
-                        val direcciones = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-                        val coordenadas = "%.6f, %.6f".format(Locale.US, location.latitude, location.longitude)
-                        
-                        if (!direcciones.isNullOrEmpty()) {
-                            "${direcciones[0].getAddressLine(0)} | GPS: $coordenadas"
-                        } else {
-                            "GPS: $coordenadas"
-                        }
-                    } catch (e: Exception) {
-                        val coordenadas = "%.6f, %.6f".format(Locale.US, location.latitude, location.longitude)
-                        "GPS: $coordenadas (dirección no encontrada)"
-                    }
-                    onLocationReady(resultado)
-                }.start()
             }
             .addOnFailureListener {
-                onLocationReady("Ubicación no disponible (error de GPS)")
+                onResultado("Error al obtener ubicación")
             }
+    }
+
+    /**
+     * Traduce coordenadas a una dirección física usando Geocoding.
+     * Actualizado para evitar APIs deprecadas en Android 13+.
+     */
+    private fun obtenerDireccion(lat: Double, lon: Double, onResultado: (String) -> Unit) {
+        val geocoder = Geocoder(contexto, Locale.getDefault())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                geocoder.getFromLocation(lat, lon, 1) { addresses ->
+                    val address = addresses.firstOrNull()
+                    val text = address?.let { "${it.getAddressLine(0)}" } ?: "Cerca de ($lat, $lon)"
+                    onResultado(text)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocation(lat, lon, 1)
+                val address = addresses?.firstOrNull()
+                val text = address?.let { "${it.getAddressLine(0)}" } ?: "Cerca de ($lat, $lon)"
+                onResultado(text)
+            }
+        } catch (e: Exception) {
+            onResultado("Coordenadas: $lat, $lon")
+        }
     }
 }
