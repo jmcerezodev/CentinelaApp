@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.glance.GlanceId
@@ -84,38 +85,49 @@ class ToggleAction : ActionCallback {
         // Si falta algún permiso, abrimos la app para solicitarlo
         if (permisoFaltante != null) {
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 putExtra("SOLICITAR_PERMISO", permisoFaltante)
             }
             if (intent != null) context.startActivity(intent)
             return
         }
 
-        // Si todos los permisos están OK, procedemos a cambiar el estado
-        updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { currentPrefs ->
-            val mutablePrefs = currentPrefs.toMutablePreferences()
-            when (accion) {
-                "grabar" -> {
-                    if (motor.estaGrabando) motor.detenerGrabacion() else motor.iniciarGrabacion()
-                    mutablePrefs[CentinelaWidget.KEY_GRABANDO] = motor.estaGrabando
-                }
-                "botones" -> {
-                    val nuevoValor = !(currentPrefs[CentinelaWidget.KEY_BOTONES] ?: false)
-                    mutablePrefs[CentinelaWidget.KEY_BOTONES] = nuevoValor
-                    prefsApp.botonesHabilitados = nuevoValor
-                }
-                "permanente" -> {
-                    val nuevoValor = !(currentPrefs[CentinelaWidget.KEY_PERMANENTE] ?: false)
-                    mutablePrefs[CentinelaWidget.KEY_PERMANENTE] = nuevoValor
-                    prefsApp.servicioPermanente = nuevoValor
-                }
-                "suspension" -> {
-                    val nuevoValor = !(currentPrefs[CentinelaWidget.KEY_SILENCIOSO] ?: false)
-                    mutablePrefs[CentinelaWidget.KEY_SILENCIOSO] = nuevoValor
-                    prefsApp.modoSilencioso = nuevoValor
+        // 3. Ejecutar la acción lógica y Sincronizar el estado visual
+        when (accion) {
+            "grabar" -> {
+                if (motor.estaGrabando) motor.detenerGrabacion() else motor.iniciarGrabacion()
+                
+                // FORZAR EL CAMBIO VISUAL AQUÍ
+                updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { prefs ->
+                    val mutable = prefs.toMutablePreferences()
+                    mutable[CentinelaWidget.KEY_GRABANDO] = motor.estaGrabando
+                    mutable
                 }
             }
-            mutablePrefs
+            "botones" -> {
+                prefsApp.botonesHabilitados = !prefsApp.botonesHabilitados
+                updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { prefs ->
+                    val mutable = prefs.toMutablePreferences()
+                    mutable[CentinelaWidget.KEY_BOTONES] = prefsApp.botonesHabilitados
+                    mutable
+                }
+            }
+            "permanente" -> {
+                prefsApp.servicioPermanente = !prefsApp.servicioPermanente
+                updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { prefs ->
+                    val mutable = prefs.toMutablePreferences()
+                    mutable[CentinelaWidget.KEY_PERMANENTE] = prefsApp.servicioPermanente
+                    mutable
+                }
+            }
+            "suspension" -> {
+                prefsApp.modoSilencioso = !prefsApp.modoSilencioso
+                updateAppWidgetState(context, PreferencesGlanceStateDefinition, glanceId) { prefs ->
+                    val mutable = prefs.toMutablePreferences()
+                    mutable[CentinelaWidget.KEY_SILENCIOSO] = prefsApp.modoSilencioso
+                    mutable
+                }
+            }
         }
 
         context.startService(Intent(context, CentinelaService::class.java))
@@ -126,17 +138,26 @@ class ToggleAction : ActionCallback {
 
 class CentinelaWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = CentinelaWidget()
+    
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == "dev.jmcerezo.ACTUALIZAR_CONFIGURACION") {
+        
+        // IMPORTANTE: Escuchar la acción oficial de Android para que cargue en producción
+        if (intent.action == "dev.jmcerezo.ACTUALIZAR_CONFIGURACION" || 
+            intent.action == android.appwidget.AppWidgetManager.ACTION_APPWIDGET_UPDATE) {
+            
             val motor = GrabadoraMotor.getInstance(context)
             val prefsApp = Preferencias(context)
+
             MainScope().launch {
                 val manager = androidx.glance.appwidget.GlanceAppWidgetManager(context)
                 val ids = manager.getGlanceIds(CentinelaWidget::class.java)
                 ids.forEach { id ->
                     updateAppWidgetState(context, PreferencesGlanceStateDefinition, id) { prefs ->
                         val mutable = prefs.toMutablePreferences()
+                        
+                        Log.d("CENTINELA_WIDGET", "Sincronizando Grabación: ${motor.estaGrabando}")
+
                         mutable[CentinelaWidget.KEY_GRABANDO] = motor.estaGrabando
                         mutable[CentinelaWidget.KEY_BOTONES] = prefsApp.botonesHabilitados
                         mutable[CentinelaWidget.KEY_PERMANENTE] = prefsApp.servicioPermanente
